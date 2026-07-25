@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/validators.dart';
-import '../widgets/bg_scaffold.dart';
-import '../widgets/glass_card.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
 
@@ -18,9 +19,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey      = GlobalKey<FormState>();
   final _emailCtrl    = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
   bool _hidePass  = true;
   bool _remember  = false;
   bool _loading   = false;
+  final _api      = ApiService();
 
   @override
   void dispose() {
@@ -32,13 +35,36 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 1400));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    try {
+      final response = await _api.login(
+        email:    _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            username: response['username'] ?? '',
+            role:     response['role'] ?? 'MEMBER',
+            email:    response['email'] ?? '',
+          ),
+        ),
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data['error'] ?? 'Login failed. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg, style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
+          backgroundColor: const Color(0xFF2D3142),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _goRegister() {
@@ -49,201 +75,335 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BgScaffold(
-      child: SingleChildScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 24, right: 24,
-            top: MediaQuery.of(context).size.height * 0.10,
-            bottom: 32,
+    return Scaffold(
+      backgroundColor: LoginColors.screenBackground,
+      body: Stack(
+        children: [
+          // ── 1. ABSTRACT GEOMETRIC LANDSCAPE (Background) ──
+          // Giant Top-Right Accent
+          Positioned(
+            top: -120,
+            right: -80,
+            child: const _NeumorphicBackgroundShape(size: 380)
+                .animate().fadeIn(duration: 800.ms).scale(begin: const Offset(0.9, 0.9)),
           ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: GlassCard(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
 
-                      // ── App icon ───────────────────
-                      _Icon(),
-                      const SizedBox(height: 16),
+          // Giant Bottom-Left Accent
+          Positioned(
+            bottom: -150,
+            left: -100,
+            child: const _NeumorphicBackgroundShape(size: 450)
+                .animate().fadeIn(duration: 1000.ms).scale(begin: const Offset(0.9, 0.9)),
+          ),
 
-                      // ── Title ──────────────────────
-                      Text('Welcome back',
-                        style: GoogleFonts.dmSerifDisplay(
-                          fontSize: 26, color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Please enter your detail to sign in.',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: Colors.white.withValues(alpha: 0.75),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 22),
+          // Small Middle-Left Accent for balance
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.35,
+            left: -60,
+            child: const _NeumorphicBackgroundShape(size: 160)
+                .animate().fadeIn(duration: 1200.ms).scale(begin: const Offset(0.9, 0.9)),
+          ),
 
-                      // ── Social row ─────────────────
-                      _SocialRow(),
-                      const SizedBox(height: 16),
-                      _OrDivider(),
-                      const SizedBox(height: 16),
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.35,
+            left: -60,
+            child: const _NeumorphicBackgroundShape(size: 160)
+                .animate().fadeIn(duration: 1200.ms).scale(begin: const Offset(0.9, 0.9)),
+          ),
 
-                      // ── Email ──────────────────────
-                      _FieldLabel('E-Mail Address'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autocorrect: false,
-                        validator: Validators.email,
-                        style: _inputTextStyle,
-                        decoration: _dec(hint: 'Enter your email...'),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // ── Password ───────────────────
-                      _FieldLabel('Password'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _passwordCtrl,
-                        obscureText: _hidePass,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _login(),
-                        validator: Validators.password,
-                        style: _inputTextStyle,
-                        decoration: _dec(
-                          hint: 'Password@123',
-                          suffix: IconButton(
-                            icon: Icon(
-                              _hidePass
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: Colors.white70, size: 20,
-                            ),
-                            onPressed: () =>
-                                setState(() => _hidePass = !_hidePass),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ── Remember + Forgot ──────────
-                      Row(
+          // ── 2. THE UI LAYER ──
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: _NeumorphicCard(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(
-                            width: 20, height: 20,
-                            child: Checkbox(
-                              value: _remember,
-                              onChanged: (v) =>
-                                  setState(() => _remember = v ?? false),
-                              activeColor: Colors.white,
-                              checkColor: AppColors.btnDark,
-                              side: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.55),
-                                width: 1.5,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                          const _NeumorphicEmblem().animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.8, 0.8)),
+                          const SizedBox(height: 24),
+
+                          Text(
+                            'Welcome back',
+                            style: GoogleFonts.dmSerifDisplay(
+                              fontSize: 32,
+                              color: LoginColors.textDark,
+                              height: 1.1,
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text('Remember me',
+                          ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sign in to your Book Lobby account',
                             style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: Colors.white.withValues(alpha: 0.80),
+                              fontSize: 14,
+                              color: LoginColors.textDark.withValues(alpha: 0.6),
+                              fontWeight: FontWeight.w500,
                             ),
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () {},
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(10, 36),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              foregroundColor: Colors.white70,
-                            ),
-                            child: Text('Forgot password?',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: Colors.white.withValues(alpha: 0.80),
+                            textAlign: TextAlign.center,
+                          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
+                          const SizedBox(height: 32),
+
+                          _FieldLabel('Email address', LoginColors.textDark).animate().fadeIn(delay: 300.ms),
+                          const SizedBox(height: 8),
+                          _buildTextField(
+                            controller: _emailCtrl,
+                            hint: 'you@gmail.com',
+                            icon: Icons.alternate_email_rounded,
+                            isEmail: true,
+                          ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.05),
+                          const SizedBox(height: 20),
+
+                          _FieldLabel('Password', LoginColors.textDark).animate().fadeIn(delay: 400.ms),
+                          const SizedBox(height: 8),
+                          _buildTextField(
+                            controller: _passwordCtrl,
+                            hint: '••••••••',
+                            icon: Icons.lock_outline_rounded,
+                            isPassword: true,
+                          ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.05),
+                          const SizedBox(height: 16),
+
+                          Row(
+                            children: [
+                              _NeumorphicCheckbox(
+                                value: _remember,
+                                onChanged: (v) => setState(() => _remember = v ?? false),
+                                accentColor: LoginColors.accent,
                               ),
-                            ),
-                          ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Remember me',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: LoginColors.textDark.withValues(alpha: 0.7),
+                                ),
+                              ),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () {},
+                                child: Text(
+                                  'Forgot password?',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: LoginColors.accent,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ).animate().fadeIn(delay: 500.ms),
+                          const SizedBox(height: 32),
+
+                          _NeumorphicButton(
+                            text: 'Sign In',
+                            loading: _loading,
+                            onTap: _login,
+                            color: LoginColors.accent,
+                          ).animate().fadeIn(delay: 550.ms).slideY(begin: 0.05),
+                          const SizedBox(height: 32),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "New to Book Lobby? ",
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: LoginColors.textDark.withValues(alpha: 0.6),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _goRegister,
+                                child: Text(
+                                  'Create an account',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: LoginColors.accent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ).animate().fadeIn(delay: 600.ms),
                         ],
                       ),
-                      const SizedBox(height: 20),
-
-                      // ── Sign in button ─────────────
-                      SizedBox(
-                        width: double.infinity, height: 50,
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.btnDark,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                            width: 20, height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5,
-                            ),
-                          )
-                              : Text('Sign in',
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              )),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Register link ──────────────
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("Don't have an account yet? ",
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: Colors.white.withValues(alpha: 0.75),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _goRegister,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.only(left: 2),
-                              minimumSize: const Size(10, 36),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: Text('Sign up',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                    ],
+                    ),
                   ),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── PURE MATTE TEXT FIELD (NO SHADOWS) ──
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool isEmail = false,
+    bool isPassword = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword && _hidePass,
+      keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.text,
+      textInputAction: isPassword ? TextInputAction.done : TextInputAction.next,
+      onFieldSubmitted: isPassword ? (_) => _login() : null,
+      validator: isEmail ? Validators.gmail : Validators.password,
+      style: GoogleFonts.inter(fontSize: 15, color: LoginColors.textDark, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.4), fontWeight: FontWeight.w500),
+        prefixIcon: Icon(icon, color: LoginColors.textDark.withValues(alpha: 0.5), size: 20),
+        suffixIcon: isPassword
+            ? GestureDetector(
+          onTap: () => setState(() => _hidePass = !_hidePass),
+          child: Icon(
+            _hidePass ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+            color: LoginColors.textDark.withValues(alpha: 0.5),
+            size: 20,
+          ),
+        )
+            : null,
+        filled: true,
+        fillColor: Colors.black.withValues(alpha: 0.04),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        errorStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFFFF6B6B), fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  NEUMORPHISM CORE COMPONENTS
+// ════════════════════════════════════════════════════════════
+
+// ── NEW: SCULPTED BACKGROUND SHAPE ──
+class _NeumorphicBackgroundShape extends StatelessWidget {
+  final double size;
+  const _NeumorphicBackgroundShape({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: LoginColors.cardBase, // Must match the background perfectly
+        shape: BoxShape.circle,
+        boxShadow: [
+          // Extra large, highly blurred shadows to create sweeping curves
+          BoxShadow(
+            color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+            offset: const Offset(18, 18),
+            blurRadius: 40,
+            spreadRadius: 4,
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.7),
+            offset: const Offset(-18, -18),
+            blurRadius: 40,
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NeumorphicCard extends StatelessWidget {
+  final Widget child;
+  const _NeumorphicCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: LoginColors.cardBase,
+        borderRadius: BorderRadius.circular(40),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFFA3B1C6),
+            offset: Offset(9, 9),
+            blurRadius: 18,
+          ),
+          BoxShadow(
+            color: Colors.white,
+            offset: Offset(-9, -9),
+            blurRadius: 18,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _NeumorphicButton extends StatelessWidget {
+  final String text;
+  final bool loading;
+  final VoidCallback onTap;
+  final Color color;
+
+  const _NeumorphicButton({
+    required this.text,
+    required this.loading,
+    required this.onTap,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: loading ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.50),
+              offset: const Offset(6, 6),
+              blurRadius: 12,
+            ),
+            const BoxShadow(
+              color: Colors.white,
+              offset: Offset(-4, -4),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: Center(
+          child: loading
+              ? const SizedBox(
+            width: 24, height: 24,
+            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+          )
+              : Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 0.5,
             ),
           ),
         ),
@@ -252,130 +412,88 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ── Shared input style ───────────────────────
-TextStyle get _inputTextStyle => GoogleFonts.inter(
-  fontSize: 14, color: Colors.white,
-);
+class _NeumorphicEmblem extends StatelessWidget {
+  const _NeumorphicEmblem();
 
-InputDecoration _dec({required String hint, Widget? suffix}) {
-  return InputDecoration(
-    hintText: hint,
-    hintStyle: GoogleFonts.inter(
-      fontSize: 14, color: Colors.white.withValues(alpha: 0.40),
-    ),
-    suffixIcon: suffix,
-    filled: true,
-    fillColor: Colors.white.withValues(alpha: 0.14),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(
-        color: Colors.white.withValues(alpha: 0.32), width: 1,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 80, height: 80,
+      decoration: BoxDecoration(
+        color: LoginColors.cardBase,
+        shape: BoxShape.circle,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFFA3B1C6),
+            offset: Offset(6, 6),
+            blurRadius: 12,
+          ),
+          BoxShadow(
+            color: Colors.white,
+            offset: Offset(-6, -6),
+            blurRadius: 12,
+          ),
+        ],
       ),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: Colors.white, width: 1.5),
-    ),
-    errorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 1),
-    ),
-    focusedErrorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 1.5),
-    ),
-    errorStyle: GoogleFonts.inter(
-      fontSize: 11, color: const Color(0xFFFFCDD2),
-    ),
-  );
+      child: const Center(
+        child: Text('📚', style: TextStyle(fontSize: 32)),
+      ),
+    );
+  }
 }
 
-// ── Small shared widgets ─────────────────────
-class _Icon extends StatelessWidget {
+class _NeumorphicCheckbox extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool?> onChanged;
+  final Color accentColor;
+
+  const _NeumorphicCheckbox({required this.value, required this.onChanged, required this.accentColor});
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: 56, height: 56,
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.22),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.48)),
-    ),
-    child: const Center(child: Text('📚', style: TextStyle(fontSize: 28))),
-  );
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: Container(
+        width: 24, height: 24,
+        decoration: BoxDecoration(
+          color: value ? accentColor : Colors.black.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: value
+              ? [
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.45),
+              offset: const Offset(3, 3),
+              blurRadius: 6.0,
+            ),
+          ]
+              : null,
+        ),
+        child: value
+            ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+            : null,
+      ),
+    );
+  }
 }
 
 class _FieldLabel extends StatelessWidget {
   final String text;
-  const _FieldLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: Text(text,
-      style: GoogleFonts.inter(
-        fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white,
-      ),
-    ),
-  );
-}
+  final Color color;
+  const _FieldLabel(this.text, this.color);
 
-class _SocialRow extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      _SBtn(icon: Icons.apple_rounded),
-      const SizedBox(width: 10),
-      _SBtn(child: Text('G',
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
         style: GoogleFonts.inter(
-          fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white,
-        ),
-      )),
-      const SizedBox(width: 10),
-      _SBtn(icon: Icons.work_outline_rounded),
-    ],
-  );
-}
-
-class _SBtn extends StatelessWidget {
-  final IconData? icon;
-  final Widget? child;
-  const _SBtn({this.icon, this.child});
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.38)),
-      ),
-      child: Center(
-        child: child ?? Icon(icon, size: 22, color: Colors.white),
-      ),
-    ),
-  );
-}
-
-class _OrDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(child: Divider(
-        color: Colors.white.withValues(alpha: 0.32), thickness: 1,
-      )),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Text('OR',
-          style: GoogleFonts.inter(
-            fontSize: 12, fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: 0.55),
-            letterSpacing: 0.8,
-          ),
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: color.withValues(alpha: 0.8),
+          letterSpacing: 0.3,
         ),
       ),
-      Expanded(child: Divider(
-        color: Colors.white.withValues(alpha: 0.32), thickness: 1,
-      )),
-    ],
-  );
+    );
+  }
 }

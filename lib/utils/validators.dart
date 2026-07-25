@@ -1,10 +1,10 @@
 class Validators {
   Validators._();
 
-  static String? email(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Email is required';
+  static String? gmail(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Gmail is required';
     final re = RegExp(r'^[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
-    if (!re.hasMatch(v.trim())) return 'Enter a valid email address';
+    if (!re.hasMatch(v.trim())) return 'Enter a valid gmail address';
     return null;
   }
 
