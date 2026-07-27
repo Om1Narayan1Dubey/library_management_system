@@ -860,34 +860,47 @@ class BooksView extends StatefulWidget {
 
 class _BooksViewState extends State<BooksView> {
   // ── STATE VARIABLES ──
-
-  final TextEditingController _searchController = TextEditingController();
-  List<dynamic> _allBooks = [];
-  List<dynamic> _filteredBooks = [];
-  bool _isLoadingBooks = true;
-
   final ApiService _apiService = ApiService();
   int _selectedMenuIndex = 0;
   bool _isSubmitting = false;
+  bool _isLoadingBooks = true;
 
   // ── CONTROLLERS (The Digital Pens) ──
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _isbnController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
-  final TextEditingController _copiesController = TextEditingController(
-    text: "1",
-  );
+  final TextEditingController _copiesController = TextEditingController(text: "1");
+
+  // ── PAGINATION & SEARCH VARIABLES ──
+  int _currentBookPage = 0;
+  bool _isFetchingMore = false;
+  bool _hasMoreBooks = true;
+  Timer? _debounce;
+
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  List<dynamic> _allBooks = [];
+  List<dynamic> _filteredBooks = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchBooks(); // Fetch data on load
-    _searchController.addListener(_filterBooksLocal); // Listen for typing
+    _fetchBooks();
+
+    _searchController.addListener(_onSearchChanged);
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+        _fetchMoreBooks();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _scrollController.dispose();
     _titleController.dispose();
     _authorController.dispose();
     _isbnController.dispose();
@@ -897,9 +910,76 @@ class _BooksViewState extends State<BooksView> {
     super.dispose();
   }
 
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _fetchBooks();
+    });
+  }
+
+  // ── API CALL: FETCH BOOKS (PAGINATED) ──
+  Future<void> _fetchBooks() async {
+    setState(() {
+      _isLoadingBooks = true;
+      _currentBookPage = 0;
+      _hasMoreBooks = true;
+      _allBooks.clear();
+      _filteredBooks.clear();
+    });
+
+    try {
+      final data = await _apiService.getAllBooks(
+          page: 0,
+          size: 20,
+          search: _searchController.text.trim()
+      );
+
+      if (mounted) {
+        setState(() {
+          _allBooks = data ?? [];
+          _filteredBooks = List.from(_allBooks);
+          _hasMoreBooks = (data?.length ?? 0) == 20;
+          _isLoadingBooks = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingBooks = false);
+    }
+  }
+
+  Future<void> _fetchMoreBooks() async {
+    if (_isFetchingMore || !_hasMoreBooks || _isLoadingBooks) return;
+
+    setState(() => _isFetchingMore = true);
+
+    try {
+      _currentBookPage++;
+      // Changed _api to _apiService
+      final data = await _apiService.getAllBooks(
+          page: _currentBookPage,
+          size: 20,
+          search: _searchController.text.trim()
+      );
+
+      if (mounted) {
+        setState(() {
+          if (data != null && data.isNotEmpty) {
+            _allBooks.addAll(data);
+            _filteredBooks = List.from(_allBooks);
+            _hasMoreBooks = data.length == 20;
+          } else {
+            _hasMoreBooks = false;
+          }
+          _isFetchingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isFetchingMore = false);
+    }
+  }
+
   // ── API CALL: SAVE BOOK ──
   Future<void> _submitBook() async {
-    // 1. Validation check
     if (_titleController.text.isEmpty || _authorController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -912,7 +992,6 @@ class _BooksViewState extends State<BooksView> {
 
     setState(() => _isSubmitting = true);
 
-    // 2. Call the backend using Dio
     bool success = await _apiService.addNewBook(
       title: _titleController.text,
       author: _authorController.text,
@@ -924,9 +1003,7 @@ class _BooksViewState extends State<BooksView> {
     if (mounted) {
       setState(() => _isSubmitting = false);
 
-      // 3. Handle the response
       if (success) {
-        // Clear the form
         _titleController.clear();
         _authorController.clear();
         _isbnController.clear();
@@ -939,6 +1016,7 @@ class _BooksViewState extends State<BooksView> {
             backgroundColor: LoginColors.accent,
           ),
         );
+        _fetchBooks(); // Refresh list after adding
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -978,13 +1056,13 @@ class _BooksViewState extends State<BooksView> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx); // Close dialog immediately
-              setState(() => _isLoadingBooks = true); // Show loading spinner
+              Navigator.pop(ctx);
+              setState(() => _isLoadingBooks = true);
 
               bool success = await _apiService.deleteBook(book['id']);
 
               if (success && mounted) {
-                await _fetchBooks(); // Refresh the list!
+                await _fetchBooks();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Book deleted successfully.'),
@@ -1053,7 +1131,6 @@ class _BooksViewState extends State<BooksView> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     _buildTextField(
                       'Book Title',
                       Icons.book,
@@ -1084,10 +1161,7 @@ class _BooksViewState extends State<BooksView> {
                       editCopiesController,
                       isNumber: true,
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Action Buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -1109,44 +1183,42 @@ class _BooksViewState extends State<BooksView> {
                           onPressed: isSaving
                               ? null
                               : () async {
-                                  setDialogState(() => isSaving = true);
+                            setDialogState(() => isSaving = true);
+                            bool success = await _apiService.updateBook(
+                              id: book['id'],
+                              title: editTitleController.text,
+                              author: editAuthorController.text,
+                              isbn: editIsbnController.text,
+                              category: editCategoryController.text,
+                              totalCopies:
+                              int.tryParse(
+                                editCopiesController.text,
+                              ) ??
+                                  1,
+                            );
 
-                                  // Call the API we built earlier!
-                                  bool success = await _apiService.updateBook(
-                                    id: book['id'],
-                                    title: editTitleController.text,
-                                    author: editAuthorController.text,
-                                    isbn: editIsbnController.text,
-                                    category: editCategoryController.text,
-                                    totalCopies:
-                                        int.tryParse(
-                                          editCopiesController.text,
-                                        ) ??
-                                        1,
-                                  );
+                            setDialogState(() => isSaving = false);
 
-                                  setDialogState(() => isSaving = false);
-
-                                  if (success && mounted) {
-                                    Navigator.pop(dialogCtx);
-                                    _fetchBooks(); // Refresh the list to show the new edits!
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Book updated successfully!',
-                                        ),
-                                        backgroundColor: LoginColors.accent,
-                                      ),
-                                    );
-                                  } else if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Failed to update book.'),
-                                        backgroundColor: AppColors.error,
-                                      ),
-                                    );
-                                  }
-                                },
+                            if (success && mounted) {
+                              Navigator.pop(dialogCtx);
+                              _fetchBooks();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Book updated successfully!',
+                                  ),
+                                  backgroundColor: LoginColors.accent,
+                                ),
+                              );
+                            } else if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to update book.'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: LoginColors.accent,
                             shape: RoundedRectangleBorder(
@@ -1159,20 +1231,20 @@ class _BooksViewState extends State<BooksView> {
                           ),
                           child: isSaving
                               ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                               : Text(
-                                  'Save Changes',
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                            'Save Changes',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1186,50 +1258,13 @@ class _BooksViewState extends State<BooksView> {
     );
   }
 
-  // ── API CALL: FETCH BOOKS ──
-  Future<void> _fetchBooks() async {
-    setState(() => _isLoadingBooks = true);
-
-
-    try {
-      final data = await _apiService.getAllBooks();
-      if (mounted) {
-        setState(() {
-          _allBooks = data;
-          _filteredBooks = data;
-          _isLoadingBooks = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoadingBooks = false);
-    }
-  }
-
-
-  // ── SEARCH FILTER LOGIC ──
-  void _filterBooksLocal() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredBooks = _allBooks.where((book) {
-        final title = (book['title'] ?? '').toString().toLowerCase();
-        final author = (book['author'] ?? '').toString().toLowerCase();
-        final category = (book['category'] ?? '').toString().toLowerCase();
-        final isbn = (book['isbn'] ?? '').toString().toLowerCase();
-        return title.contains(query) ||
-            author.contains(query) ||
-            category.contains(query) ||
-            isbn.contains(query);
-      }).toList();
-    });
-  }
-
   // ── UI HELPER: TEXT FIELD ──
   Widget _buildTextField(
-    String hint,
-    IconData icon,
-    TextEditingController controller, {
-    bool isNumber = false,
-  }) {
+      String hint,
+      IconData icon,
+      TextEditingController controller, {
+        bool isNumber = false,
+      }) {
     return Container(
       decoration: BoxDecoration(
         color: LoginColors.cardBase,
@@ -1308,25 +1343,24 @@ class _BooksViewState extends State<BooksView> {
               onPressed: _isSubmitting ? null : _submitBook,
               style: ElevatedButton.styleFrom(
                 backgroundColor: LoginColors.accent,
-                elevation: 2, // Standard subtle elevation
+                elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
               child: _isSubmitting
                   ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 3,
-                      ),
-                    )
-                  // Reset to default font style!
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              )
                   : const Text(
-                      'Save Book to Database',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
+                'Save Book to Database',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
             ),
           ),
         ],
@@ -1365,184 +1399,196 @@ class _BooksViewState extends State<BooksView> {
   }) {
     Widget listContent = _isLoadingBooks
         ? const Center(
-            child: CircularProgressIndicator(color: LoginColors.accent),
-          )
+      child: CircularProgressIndicator(color: LoginColors.accent),
+    )
         : _filteredBooks.isEmpty
         ? Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Text(
-                'No books found.',
-                style: GoogleFonts.inter(
-                  color: LoginColors.textDark.withValues(alpha: 0.4),
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Text(
+          'No books found.',
+          style: GoogleFonts.inter(
+            color: LoginColors.textDark.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+    )
+        : ListView.builder(
+      controller: _scrollController, // ADDED THE SCROLL CONTROLLER HERE!
+      physics: isMobile
+          ? const NeverScrollableScrollPhysics()
+          : const BouncingScrollPhysics(),
+      shrinkWrap: isMobile,
+      padding: const EdgeInsets.only(
+        bottom: 20,
+        top: 4,
+        left: 16,
+        right: 16,
+      ),
+      itemCount: _filteredBooks.length + (_isFetchingMore ? 1 : 0),
+      itemBuilder: (context, index) {
+
+        // Draw the loading spinner at the very bottom
+        if (index == _filteredBooks.length) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(
+              child: CircularProgressIndicator(color: LoginColors.accent),
+            ),
+          );
+        }
+
+        final book = _filteredBooks[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: LoginColors.cardBase,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                offset: const Offset(4, 4),
+                blurRadius: 10,
+              ),
+              const BoxShadow(
+                color: Colors.white,
+                offset: Offset(-4, -4),
+                blurRadius: 10,
+              ),
+            ],
+            border: Border.all(color: Colors.white, width: 1),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AdminColors.purple.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.book_rounded,
+                  color: AdminColors.purple,
+                  size: 24,
                 ),
               ),
-            ),
-          )
-        : ListView.builder(
-            physics: isMobile
-                ? const NeverScrollableScrollPhysics()
-                : const BouncingScrollPhysics(),
-            shrinkWrap: isMobile,
-            padding: const EdgeInsets.only(
-              bottom: 20,
-              top: 4,
-              left: 16,
-              right: 16,
-            ),
-            itemCount: _filteredBooks.length,
-            itemBuilder: (context, index) {
-              final book = _filteredBooks[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: LoginColors.cardBase,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
-                      offset: const Offset(4, 4),
-                      blurRadius: 10,
-                    ),
-                    const BoxShadow(
-                      color: Colors.white,
-                      offset: Offset(-4, -4),
-                      blurRadius: 10,
-                    ),
-                  ],
-                  border: Border.all(color: Colors.white, width: 1),
-                ),
-                child: Row(
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AdminColors.purple.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.book_rounded,
-                        color: AdminColors.purple,
-                        size: 24,
+                    Text(
+                      isDeleteMode
+                          ? 'Delete Books (Danger Zone)'
+                          : 'Library Database',
+                      style: GoogleFonts.dmSerifDisplay(
+                        fontSize: 14,
+                        color: isDeleteMode
+                            ? AppColors.error
+                            : LoginColors.accent,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isDeleteMode
-                                ? 'Delete Books (Danger Zone)'
-                                : 'Library Database',
-                            style: GoogleFonts.dmSerifDisplay(
-                              fontSize: 14,
-                              color: isDeleteMode
-                                  ? AppColors.error
-                                  : LoginColors.accent,
-                            ),
+                    Text(
+                      book['title'] ?? 'Unknown Title',
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Author: ${book['author'] ?? 'Unknown'}',
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark.withValues(
+                          alpha: 0.6,
+                        ),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          Text(
-                            book['title'] ?? 'Unknown Title',
+                          decoration: BoxDecoration(
+                            color: LoginColors.accent.withValues(
+                              alpha: 0.1,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            book['category'] ?? 'General',
                             style: GoogleFonts.inter(
-                              color: LoginColors.textDark,
-                              fontSize: 14,
+                              color: LoginColors.accent,
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Author: ${book['author'] ?? 'Unknown'}',
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Copies: ${book['available_copies'] ?? book['copies'] ?? 1} / ${book['total_copies'] ?? book['copies'] ?? 1}',
                             style: GoogleFonts.inter(
                               color: LoginColors.textDark.withValues(
-                                alpha: 0.6,
+                                alpha: 0.7,
                               ),
-                              fontSize: 12,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: LoginColors.accent.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  book['category'] ?? 'General',
-                                  style: GoogleFonts.inter(
-                                    color: LoginColors.accent,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Copies: ${book['copies'] ?? 1}',
-                                  style: GoogleFonts.inter(
-                                    color: LoginColors.textDark.withValues(
-                                      alpha: 0.7,
-                                    ),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: isDeleteMode
-                            ? AppColors.error.withValues(alpha: 0.1)
-                            : LoginColors.accent.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          isDeleteMode
-                              ? Icons.delete_forever_rounded
-                              : Icons.edit_rounded,
-                          color: isDeleteMode
-                              ? AppColors.error
-                              : LoginColors.accent,
-                          size: 20,
                         ),
-                        onPressed: () {
-                          if (isDeleteMode) {
-                            _showDeleteBookDialog(book); // Show the red warning
-                          } else {
-                            _showEditBookDialog(book); // Show the edit pop-up
-                          }
-                        },
-                      ),
+                      ],
                     ),
                   ],
                 ),
-              );
-            },
-          );
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: isDeleteMode
+                      ? AppColors.error.withValues(alpha: 0.1)
+                      : LoginColors.accent.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    isDeleteMode
+                        ? Icons.delete_forever_rounded
+                        : Icons.edit_rounded,
+                    color: isDeleteMode
+                        ? AppColors.error
+                        : LoginColors.accent,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    if (isDeleteMode) {
+                      _showDeleteBookDialog(book);
+                    } else {
+                      _showEditBookDialog(book);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1586,7 +1632,6 @@ class _BooksViewState extends State<BooksView> {
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 850;
 
-    // LEFT MENU
     Widget leftMenu = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1623,7 +1668,6 @@ class _BooksViewState extends State<BooksView> {
       ],
     );
 
-    // RIGHT CONTENT AREA
     Widget mainContentArea = Container(
       decoration: BoxDecoration(
         color: LoginColors.cardBase,
@@ -1651,7 +1695,6 @@ class _BooksViewState extends State<BooksView> {
       ),
     );
 
-    // RESPONSIVE LAYOUT
     if (isMobile) {
       return SingleChildScrollView(
         clipBehavior: Clip.none,
@@ -1677,12 +1720,12 @@ class _BooksViewState extends State<BooksView> {
 
   // ── UI HELPER: MENU BUTTONS ──
   Widget _buildMenuButton(
-    int index,
-    String title,
-    String subtitle,
-    IconData icon, {
-    bool isDanger = false,
-  }) {
+      int index,
+      String title,
+      String subtitle,
+      IconData icon, {
+        bool isDanger = false,
+      }) {
     final isSelected = _selectedMenuIndex == index;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1697,17 +1740,17 @@ class _BooksViewState extends State<BooksView> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: isSelected
                 ? [
-                    BoxShadow(
-                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
-                      offset: const Offset(4, 4),
-                      blurRadius: 10,
-                    ),
-                    const BoxShadow(
-                      color: Colors.white,
-                      offset: Offset(-4, -4),
-                      blurRadius: 10,
-                    ),
-                  ]
+              BoxShadow(
+                color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                offset: const Offset(4, 4),
+                blurRadius: 10,
+              ),
+              const BoxShadow(
+                color: Colors.white,
+                offset: Offset(-4, -4),
+                blurRadius: 10,
+              ),
+            ]
                 : [],
           ),
           child: Row(
@@ -1718,8 +1761,8 @@ class _BooksViewState extends State<BooksView> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? (isDanger
-                            ? AppColors.error.withValues(alpha: 0.2)
-                            : LoginColors.accent.withValues(alpha: 0.2))
+                      ? AppColors.error.withValues(alpha: 0.2)
+                      : LoginColors.accent.withValues(alpha: 0.2))
                       : Colors.black.withValues(alpha: 0.05),
                   shape: BoxShape.circle,
                 ),

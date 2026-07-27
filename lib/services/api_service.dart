@@ -192,16 +192,22 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getAllBooks() async {
+  Future<List<dynamic>?> getAllBooks({int page = 0, int size = 20, String? search}) async {
     try {
-      final response = await _dio.get('/books');
-      if (response.statusCode == 200) {
-        return response.data;
+      String url = '/admin/books?page=$page&size=$size';
+
+      if (search != null && search.isNotEmpty) {
+        url += '&search=${Uri.encodeComponent(search)}';
       }
-      return [];
+
+      final response = await _dio.get(url);
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      }
+      return null;
     } catch (e) {
       debugPrint('Error fetching books: $e');
-      return [];
+      return null;
     }
   }
 
