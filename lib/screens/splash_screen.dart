@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../services/api_service.dart';
-import '../theme/app_colors.dart'; // Make sure this is imported for LoginColors!
-
+import '../theme/app_colors.dart';
+import 'home_screen.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,7 +14,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -21,42 +21,55 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkSession() async {
-    // We wait 2.0 seconds so the user can see the beautiful splash screen animations!
     await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
 
-    final api = ApiService();
-    final loggedIn = await api.isLoggedIn();
+    try {
+      final api = ApiService();
+      final loggedIn = await api.isLoggedIn();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (loggedIn) {
-      try {
-        // Fetch saved profile to get username and role
+      if (loggedIn) {
+        // Fetch the user's details from the backend
         final profile = await api.getProfile();
         if (!mounted) return;
 
-        // PushReplacement means we destroy the splash screen.
-        Navigator.of(context).pushReplacementNamed('/home-admin'); // Using our new routing!
-
-      } catch (_) {
-        if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed('/login'); // Using our new routing!
+        // 1. THE FIX: Pass the required variables to HomeScreen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(
+              username: profile['username'] ?? 'User',
+              role: profile['role'] ?? 'MEMBER',
+              email: profile['email'] ?? '',
+            ),
+          ),
+        );
+      } else {
+        // 2. THE FIX: Use the capitalized Class Name!
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
       }
-    } else {
-      Navigator.of(context).pushReplacementNamed('/login'); // Using our new routing!
+    } catch (e) {
+      debugPrint('Splash Screen Network/CORS Error caught: $e');
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: LoginColors.screenBackground, // 1. Solid Grey Background
+      backgroundColor: LoginColors.screenBackground, 
       body: Stack(
         children: [
-          // ── 2. ABSTRACT GEOMETRIC LANDSCAPE (Matches Login exactly) ──
           Positioned(
             top: -120, right: -80,
             child: const _NeumorphicBackgroundShape(size: 380)

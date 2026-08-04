@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../utils/validators.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
+import '../utils/top_toast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -54,14 +55,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } on DioException catch (e) {
       final msg = e.response?.data['error'] ?? 'Login failed. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg, style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
-          backgroundColor: const Color(0xFF2D3142),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      );
+
+      TopToast.show(context, msg, isError: true);
+
     } finally {
       if (mounted) setState(() => _loading = false);
     }

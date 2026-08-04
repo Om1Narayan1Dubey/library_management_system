@@ -930,7 +930,7 @@ class _BooksViewState extends State<BooksView> {
     try {
       final data = await _apiService.getAllBooks(
           page: 0,
-          size: 20,
+          size: 5,
           search: _searchController.text.trim()
       );
 
@@ -938,7 +938,7 @@ class _BooksViewState extends State<BooksView> {
         setState(() {
           _allBooks = data ?? [];
           _filteredBooks = List.from(_allBooks);
-          _hasMoreBooks = (data?.length ?? 0) == 20;
+          _hasMoreBooks = (data?.length ?? 0) == 5;
           _isLoadingBooks = false;
         });
       }
@@ -957,7 +957,7 @@ class _BooksViewState extends State<BooksView> {
       // Changed _api to _apiService
       final data = await _apiService.getAllBooks(
           page: _currentBookPage,
-          size: 20,
+          size: 5,
           search: _searchController.text.trim()
       );
 
@@ -966,7 +966,7 @@ class _BooksViewState extends State<BooksView> {
           if (data != null && data.isNotEmpty) {
             _allBooks.addAll(data);
             _filteredBooks = List.from(_allBooks);
-            _hasMoreBooks = data.length == 20;
+            _hasMoreBooks = data.length == 5;
           } else {
             _hasMoreBooks = false;
           }
@@ -1414,7 +1414,7 @@ class _BooksViewState extends State<BooksView> {
       ),
     )
         : ListView.builder(
-      controller: _scrollController, // ADDED THE SCROLL CONTROLLER HERE!
+      controller: isMobile ? null : _scrollController,
       physics: isMobile
           ? const NeverScrollableScrollPhysics()
           : const BouncingScrollPhysics(),
@@ -1697,6 +1697,7 @@ class _BooksViewState extends State<BooksView> {
 
     if (isMobile) {
       return SingleChildScrollView(
+        controller: _scrollController,
         clipBehavior: Clip.none,
         padding: const EdgeInsets.all(8.0),
         child: Column(
@@ -1884,13 +1885,13 @@ class _MembersViewState extends State<MembersView> {
       _currentMemberPage = 0;
       _hasMoreMembers = true;
       _allMembers.clear();
-      _filteredMembers.clear(); // We can still use this variable for the UI list
+      _filteredMembers.clear();
     });
 
     try {
       final data = await _api.getAllMembers(
           page: 0,
-          size: 20,
+          size: 5,
           search: _searchController.text.trim()
       );
 
@@ -1898,7 +1899,7 @@ class _MembersViewState extends State<MembersView> {
         setState(() {
           _allMembers = data ?? [];
           _filteredMembers = List.from(_allMembers);
-          _hasMoreMembers = (data?.length ?? 0) == 20;
+          _hasMoreMembers = (data?.length ?? 0) == 5;
           _isLoadingMembers = false;
         });
       }
@@ -1916,7 +1917,7 @@ class _MembersViewState extends State<MembersView> {
       _currentMemberPage++;
       final data = await _api.getAllMembers(
           page: _currentMemberPage,
-          size: 20,
+          size: 5,
           search: _searchController.text.trim()
       );
 
@@ -1925,7 +1926,7 @@ class _MembersViewState extends State<MembersView> {
           if (data != null && data.isNotEmpty) {
             _allMembers.addAll(data);
             _filteredMembers = List.from(_allMembers);
-            _hasMoreMembers = data.length == 20;
+            _hasMoreMembers = data.length == 5;
           } else {
             _hasMoreMembers = false;
           }
@@ -3194,6 +3195,9 @@ class ReportsView extends StatefulWidget {
 class _ReportsViewState extends State<ReportsView> {
   int _selectedMenuIndex = 0;
 
+  Timer? _debounce;
+
+
   bool _isLoadingHistory = true;
   List<dynamic> _borrowHistory = [];
 
@@ -3213,7 +3217,6 @@ class _ReportsViewState extends State<ReportsView> {
     });
   }
 
-  // ── NEW: FILTER STATE VARIABLES ──
   String _filterAction = 'ALL';
   String _filterSort = 'LATEST';
   DateTime _filterDate = DateTime.now();
@@ -3234,6 +3237,7 @@ class _ReportsViewState extends State<ReportsView> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _dailySearchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -3241,27 +3245,31 @@ class _ReportsViewState extends State<ReportsView> {
 
   // ── SEARCH & FILTER LOGIC ──
   void _filterDailyLogs() {
-    final query = _dailySearchController.text.toLowerCase();
+    // If the user is still typing, cancel the old timer.
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
 
-    setState(() {
-      _filteredDailyLogs = _allDailyLogs.where((log) {
-        final book = (log['book_title'] ?? '').toString().toLowerCase();
-        final member = (log['member_name'] ?? '').toString().toLowerCase();
-        final action = (log['action'] ?? '').toString();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
 
-        final matchesSearch = book.contains(query) || member.contains(query);
-        final matchesAction = _filterAction == 'ALL' || action == _filterAction;
+      final query = _dailySearchController.text.toLowerCase();
+      setState(() {
+        _filteredDailyLogs = _allDailyLogs.where((log) {
+          final book = (log['book_title'] ?? '').toString().toLowerCase();
+          final member = (log['member_name'] ?? '').toString().toLowerCase();
+          final action = (log['action'] ?? '').toString();
 
-        return matchesSearch && matchesAction;
-      }).toList();
+          final matchesSearch = book.contains(query) || member.contains(query);
+          final matchesAction = _filterAction == 'ALL' || action == _filterAction;
 
-      if (_filterSort == 'OLDEST') {
-        _filteredDailyLogs = _filteredDailyLogs.reversed.toList();
-      }
+          return matchesSearch && matchesAction;
+        }).toList();
+
+        if (_filterSort == 'OLDEST') {
+          _filteredDailyLogs = _filteredDailyLogs.reversed.toList();
+        }
+      });
     });
   }
 
-  // ── REAL API DATA FOR DAILY ACTIVITY ──
   Future<void> _fetchDailyActivity() async {
     setState(() => _isLoadingDaily = true);
 
@@ -3302,13 +3310,12 @@ class _ReportsViewState extends State<ReportsView> {
 
     try {
       final ApiService api = ApiService();
-      final data = await api.getGlobalBorrowHistory(page: 0, size: 20);
+      final data = await api.getGlobalBorrowHistory(page: 0, size: 5);
 
       if (mounted) {
         setState(() {
           _borrowHistory = data ?? [];
-          // If we got exactly 20 back, there might be more. If less, we hit the end!
-          _hasMoreHistory = (data?.length ?? 0) == 20;
+          _hasMoreHistory = (data?.length ?? 0) == 5;
           _isLoadingHistory = false;
         });
       }
@@ -3325,13 +3332,13 @@ class _ReportsViewState extends State<ReportsView> {
     try {
       _currentHistoryPage++;
       final ApiService api = ApiService();
-      final newData = await api.getGlobalBorrowHistory(page: _currentHistoryPage, size: 20);
+      final newData = await api.getGlobalBorrowHistory(page: _currentHistoryPage, size: 5);
 
       if (mounted) {
         setState(() {
           if (newData != null && newData.isNotEmpty) {
-            _borrowHistory.addAll(newData); // ADD to the list, don't replace it!
-            _hasMoreHistory = newData.length == 20;
+            _borrowHistory.addAll(newData);
+            _hasMoreHistory = newData.length == 5;
           } else {
             _hasMoreHistory = false;
           }

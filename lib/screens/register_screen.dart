@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../utils/validators.dart';
 import '../widgets/otp_input_widget.dart';
 import 'login_screen.dart';
+import '../utils/top_toast.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -155,12 +156,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _toast(String msg, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
-      backgroundColor: const Color(0xFF2D3142),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    ));
+    TopToast.show(context, msg, isError: error);
   }
 
   @override
@@ -245,7 +241,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               const SizedBox(width: 10),
                               SizedBox(
-                                height: 56, // Matches text field height perfectly
+                                height: 56,
                                 child: _NeumorphicSmallButton(
                                   onTap: (_sendingOtp || _countdown > 0) ? null : _sendOtp,
                                   loading: _sendingOtp,
