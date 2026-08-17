@@ -138,16 +138,12 @@ class ApiService {
   }
 
   Future<void> addMember(String username, String email, String password, String role) async {
-    try {
       await _dio.post('/admin/members', data: {
         'username': username,
         'email': email,
-        'password': password, // Now sending the password to the backend
+        'password': password,
         'role': role,
       });
-    } catch (e) {
-      throw Exception('Failed to add member');
-    }
   }
 
   Future<void> deleteMember(int userId) async {
@@ -249,9 +245,15 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>?> getDailyActivityLogs() async {
+  Future<Map<String, dynamic>?> getDailyActivityLogs({String? date}) async {
     try {
-      final response = await _dio.get('/reports/daily-activity');
+      String url = '/reports/daily-activity';
+
+      if (date != null && date.isNotEmpty) {
+        url += '?date=$date';
+      }
+
+      final response = await _dio.get(url);
       if (response.statusCode == 200) {
         return response.data;
       }

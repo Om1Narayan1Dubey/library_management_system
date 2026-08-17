@@ -5,15 +5,17 @@ import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
@@ -31,19 +33,15 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
 
       if (loggedIn) {
-        // Fetch the user's details from the backend
         final profile = await api.getProfile();
         if (!mounted) return;
 
-        // 1. THE FIX: Pass the required variables to HomeScreen
+        ref.read(currentUserProvider.notifier).state = profile;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => HomeScreen(
-              username: profile['username'] ?? 'User',
-              role: profile['role'] ?? 'MEMBER',
-              email: profile['email'] ?? '',
-            ),
+            builder: (context) => const HomeScreen(),
           ),
         );
       } else {

@@ -5,19 +5,18 @@ import '../../theme/app_colors.dart';
 import '../../widgets/bg_scaffold.dart';
 import '../../widgets/glass_card.dart';
 import '../login_screen.dart';
+import '../../providers/auth_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class StudentHomeScreen extends StatelessWidget {
-  final String username;
-  final String email;
-
-  const StudentHomeScreen({
-    super.key,
-    required this.username,
-    required this.email,
-  });
+class StudentHomeScreen extends ConsumerWidget {
+  const StudentHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+
+    final user = ref.watch(currentUserProvider);
+    final username = user?['username'] ?? 'Student';
+
     return BgScaffold(
       child: Center(
         child: Padding(

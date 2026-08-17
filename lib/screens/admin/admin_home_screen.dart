@@ -1,33 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/bg_scaffold.dart';
 import '../login_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
+import 'package:dio/dio.dart';
+import '../../utils/top_toast.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 // 🟩🟩🟩🟩🟩             MAIN ADMIN LAYOUT             🟩🟩🟩🟩🟩
 // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
-class AdminHomeScreen extends StatefulWidget {
-  final String username;
-  final String email;
+final adminTabProvider = StateProvider<int>((ref) => 0);
 
-  const AdminHomeScreen({
-    super.key,
-    required this.username,
-    required this.email,
-  });
+class AdminHomeScreen extends ConsumerStatefulWidget {
+  const AdminHomeScreen({super.key});
 
   @override
-  State<AdminHomeScreen> createState() => _AdminHomeScreenState();
+  ConsumerState<AdminHomeScreen> createState() => _AdminHomeScreenState();
 }
 
-class _AdminHomeScreenState extends State<AdminHomeScreen> {
+class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   final _api = ApiService();
-  int _selectedIndex = 0;
 
   Future<void> _signOut() async {
     final navigator = Navigator.of(context);
@@ -83,37 +81,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _buildCurrentView() {
-    switch (_selectedIndex) {
-      case 0:
-        return const DashboardView();
-      case 1:
-        return const BooksView();
-      case 2:
-        return MembersView(adminEmail: widget.email);
-      case 3:
-        return const ReportsView();
-      default:
-        return const DashboardView();
+  Widget _buildCurrentView(int currentIndex) {
+    final user = ref.watch(currentUserProvider);
+    final email = user?['email'] ?? '';
+
+    switch (currentIndex) {
+      case 0: return const DashboardView();
+      case 1: return const BooksView();
+      case 2: return MembersView(adminEmail: email); // Pass the vault email here
+      case 3: return const ReportsView();
+      default: return const DashboardView();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+
+    final currentIndex = ref.watch(adminTabProvider);
+
     return BgScaffold(
       child: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
             const SizedBox(height: 10),
-            Expanded(child: _buildUnifiedTabInterface()),
+            Expanded(child: _buildUnifiedTabInterface(currentIndex)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildUnifiedTabInterface() {
+  Widget _buildUnifiedTabInterface(int currentIndex) {
     const double tabHeight = 70.0;
 
     return Stack(
@@ -144,7 +143,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 padding: const EdgeInsets.all(20.0),
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
-                  child: _buildCurrentView(),
+                  child: _buildCurrentView(currentIndex),
                 ),
               ),
             ),
@@ -159,10 +158,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _buildTabItem(0, Icons.dashboard_rounded, 'Dashboard', tabHeight),
-              _buildTabItem(1, Icons.menu_book_rounded, 'Books', tabHeight),
-              _buildTabItem(2, Icons.people_rounded, 'Members', tabHeight),
-              _buildTabItem(3, Icons.bar_chart_rounded, 'Reports', tabHeight),
+              _buildTabItem(0, Icons.dashboard_rounded, 'Dashboard', tabHeight, currentIndex),
+              _buildTabItem(1, Icons.menu_book_rounded, 'Books', tabHeight, currentIndex),
+              _buildTabItem(2, Icons.people_rounded, 'Members', tabHeight, currentIndex),
+              _buildTabItem(3, Icons.bar_chart_rounded, 'Reports', tabHeight, currentIndex),
             ],
           ),
         ),
@@ -170,11 +169,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _buildTabItem(int index, IconData icon, String label, double height) {
-    final isSelected = _selectedIndex == index;
+  Widget _buildTabItem(int index, IconData icon, String label, double height, int currentIndex) {
+    final isSelected = currentIndex == index;
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = index),
+
+      onTap: () => ref.read(adminTabProvider.notifier).state = index,
+
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         height: height - 10,
@@ -226,14 +227,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Widget _buildTopBar() {
+
+    final user = ref.watch(currentUserProvider);
+    final username = user?['username'] ?? 'Admin';
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: LoginColors.cardBase, // Neumorphic base color
+        color: LoginColors.cardBase,
         borderRadius: BorderRadius.circular(24),
         boxShadow: const [
-          // The classic Neumorphic double-shadow
           BoxShadow(
             color: Color(0xFFA3B1C6),
             offset: Offset(6, 6),
@@ -258,7 +262,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     color: LoginColors.cardBase,
                     shape: BoxShape.circle,
                     boxShadow: [
-                      // Inset-style shadow for the icon
                       BoxShadow(
                         color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
                         offset: const Offset(3, 3),
@@ -293,7 +296,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        widget.username,
+                        username,
                         style: GoogleFonts.dmSerifDisplay(
                           fontSize: 17,
                           color: LoginColors.textDark,
@@ -408,7 +411,6 @@ class _DashboardViewState extends State<DashboardView> {
     }
   }
 
-
   List<FlSpot> _getRealChartData(int index) {
     if (_stats == null) return [const FlSpot(0, 0)];
 
@@ -459,8 +461,11 @@ class _DashboardViewState extends State<DashboardView> {
       return const Center(
         child: CircularProgressIndicator(color: LoginColors.accent),
       );
-    if (_errorMessage.isNotEmpty) return Center(
-        child: Text(_errorMessage, style: GoogleFonts.inter(color: AppColors.error),
+    if (_errorMessage.isNotEmpty)
+      return Center(
+        child: Text(
+          _errorMessage,
+          style: GoogleFonts.inter(color: AppColors.error),
         ),
       );
 
@@ -870,7 +875,9 @@ class _BooksViewState extends State<BooksView> {
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _isbnController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
-  final TextEditingController _copiesController = TextEditingController(text: "1");
+  final TextEditingController _copiesController = TextEditingController(
+    text: "1",
+  );
 
   // ── PAGINATION & SEARCH VARIABLES ──
   int _currentBookPage = 0;
@@ -891,7 +898,8 @@ class _BooksViewState extends State<BooksView> {
     _searchController.addListener(_onSearchChanged);
 
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 50) {
         _fetchMoreBooks();
       }
     });
@@ -929,9 +937,9 @@ class _BooksViewState extends State<BooksView> {
 
     try {
       final data = await _apiService.getAllBooks(
-          page: 0,
-          size: 5,
-          search: _searchController.text.trim()
+        page: 0,
+        size: 5,
+        search: _searchController.text.trim(),
       );
 
       if (mounted) {
@@ -956,9 +964,9 @@ class _BooksViewState extends State<BooksView> {
       _currentBookPage++;
       // Changed _api to _apiService
       final data = await _apiService.getAllBooks(
-          page: _currentBookPage,
-          size: 5,
-          search: _searchController.text.trim()
+        page: _currentBookPage,
+        size: 5,
+        search: _searchController.text.trim(),
       );
 
       if (mounted) {
@@ -980,23 +988,21 @@ class _BooksViewState extends State<BooksView> {
 
   // ── API CALL: SAVE BOOK ──
   Future<void> _submitBook() async {
-    if (_titleController.text.isEmpty || _authorController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Title and Author are required!'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+    if (_titleController.text.trim().isEmpty ||
+        _authorController.text.trim().isEmpty ||
+        _isbnController.text.trim().isEmpty ||
+        _categoryController.text.trim().isEmpty) {
+      TopToast.show(context, 'All fields are required!', isError: true);
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     bool success = await _apiService.addNewBook(
-      title: _titleController.text,
-      author: _authorController.text,
-      isbn: _isbnController.text,
-      category: _categoryController.text,
+      title: _titleController.text.trim(),
+      author: _authorController.text.trim(),
+      isbn: _isbnController.text.trim(),
+      category: _categoryController.text.trim(),
       copies: int.tryParse(_copiesController.text) ?? 1,
     );
 
@@ -1010,19 +1016,14 @@ class _BooksViewState extends State<BooksView> {
         _categoryController.clear();
         _copiesController.text = "1";
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Book Added Successfully!'),
-            backgroundColor: LoginColors.accent,
-          ),
-        );
-        _fetchBooks(); // Refresh list after adding
+        TopToast.show(context, 'Book Added Successfully!');
+
+        _fetchBooks();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add book to database.'),
-            backgroundColor: AppColors.error,
-          ),
+        TopToast.show(
+          context,
+          'Failed to add book to database.',
+          isError: true,
         );
       }
     }
@@ -1063,20 +1064,10 @@ class _BooksViewState extends State<BooksView> {
 
               if (success && mounted) {
                 await _fetchBooks();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Book deleted successfully.'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
+                TopToast.show(context, 'Book deleted successfully.');
               } else if (mounted) {
                 setState(() => _isLoadingBooks = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to delete book.'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
+                TopToast.show(context, 'Failed to delete book.', isError: true);
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -1183,42 +1174,37 @@ class _BooksViewState extends State<BooksView> {
                           onPressed: isSaving
                               ? null
                               : () async {
-                            setDialogState(() => isSaving = true);
-                            bool success = await _apiService.updateBook(
-                              id: book['id'],
-                              title: editTitleController.text,
-                              author: editAuthorController.text,
-                              isbn: editIsbnController.text,
-                              category: editCategoryController.text,
-                              totalCopies:
-                              int.tryParse(
-                                editCopiesController.text,
-                              ) ??
-                                  1,
-                            );
+                                  setDialogState(() => isSaving = true);
+                                  bool success = await _apiService.updateBook(
+                                    id: book['id'],
+                                    title: editTitleController.text,
+                                    author: editAuthorController.text,
+                                    isbn: editIsbnController.text,
+                                    category: editCategoryController.text,
+                                    totalCopies:
+                                        int.tryParse(
+                                          editCopiesController.text,
+                                        ) ??
+                                        1,
+                                  );
 
-                            setDialogState(() => isSaving = false);
+                                  setDialogState(() => isSaving = false);
 
-                            if (success && mounted) {
-                              Navigator.pop(dialogCtx);
-                              _fetchBooks();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Book updated successfully!',
-                                  ),
-                                  backgroundColor: LoginColors.accent,
-                                ),
-                              );
-                            } else if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Failed to update book.'),
-                                  backgroundColor: AppColors.error,
-                                ),
-                              );
-                            }
-                          },
+                                  if (success && mounted) {
+                                    Navigator.pop(dialogCtx);
+                                    _fetchBooks();
+                                    TopToast.show(
+                                      context,
+                                      'Book updated successfully!',
+                                    );
+                                  } else if (mounted) {
+                                    TopToast.show(
+                                      context,
+                                      'Failed to update book.',
+                                      isError: true,
+                                    );
+                                  }
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: LoginColors.accent,
                             shape: RoundedRectangleBorder(
@@ -1231,20 +1217,20 @@ class _BooksViewState extends State<BooksView> {
                           ),
                           child: isSaving
                               ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : Text(
-                            'Save Changes',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                                  'Save Changes',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ],
                     ),
@@ -1260,11 +1246,11 @@ class _BooksViewState extends State<BooksView> {
 
   // ── UI HELPER: TEXT FIELD ──
   Widget _buildTextField(
-      String hint,
-      IconData icon,
-      TextEditingController controller, {
-        bool isNumber = false,
-      }) {
+    String hint,
+    IconData icon,
+    TextEditingController controller, {
+    bool isNumber = false,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: LoginColors.cardBase,
@@ -1350,17 +1336,17 @@ class _BooksViewState extends State<BooksView> {
               ),
               child: _isSubmitting
                   ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 3,
-                ),
-              )
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
                   : const Text(
-                'Save Book to Database',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
+                      'Save Book to Database',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
             ),
           ),
         ],
@@ -1399,196 +1385,195 @@ class _BooksViewState extends State<BooksView> {
   }) {
     Widget listContent = _isLoadingBooks
         ? const Center(
-      child: CircularProgressIndicator(color: LoginColors.accent),
-    )
+            child: CircularProgressIndicator(color: LoginColors.accent),
+          )
         : _filteredBooks.isEmpty
         ? Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Text(
-          'No books found.',
-          style: GoogleFonts.inter(
-            color: LoginColors.textDark.withValues(alpha: 0.4),
-          ),
-        ),
-      ),
-    )
-        : ListView.builder(
-      controller: isMobile ? null : _scrollController,
-      physics: isMobile
-          ? const NeverScrollableScrollPhysics()
-          : const BouncingScrollPhysics(),
-      shrinkWrap: isMobile,
-      padding: const EdgeInsets.only(
-        bottom: 20,
-        top: 4,
-        left: 16,
-        right: 16,
-      ),
-      itemCount: _filteredBooks.length + (_isFetchingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-
-        // Draw the loading spinner at the very bottom
-        if (index == _filteredBooks.length) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Center(
-              child: CircularProgressIndicator(color: LoginColors.accent),
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'No books found.',
+                style: GoogleFonts.inter(
+                  color: LoginColors.textDark.withValues(alpha: 0.4),
+                ),
+              ),
             ),
-          );
-        }
+          )
+        : ListView.builder(
+            controller: isMobile ? null : _scrollController,
+            physics: isMobile
+                ? const NeverScrollableScrollPhysics()
+                : const BouncingScrollPhysics(),
+            shrinkWrap: isMobile,
+            padding: const EdgeInsets.only(
+              bottom: 20,
+              top: 4,
+              left: 16,
+              right: 16,
+            ),
+            itemCount: _filteredBooks.length + (_isFetchingMore ? 1 : 0),
+            itemBuilder: (context, index) {
+              // Draw the loading spinner at the very bottom
+              if (index == _filteredBooks.length) {
+                return const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(
+                    child: CircularProgressIndicator(color: LoginColors.accent),
+                  ),
+                );
+              }
 
-        final book = _filteredBooks[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: LoginColors.cardBase,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
-                offset: const Offset(4, 4),
-                blurRadius: 10,
-              ),
-              const BoxShadow(
-                color: Colors.white,
-                offset: Offset(-4, -4),
-                blurRadius: 10,
-              ),
-            ],
-            border: Border.all(color: Colors.white, width: 1),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
+              final book = _filteredBooks[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AdminColors.purple.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: LoginColors.cardBase,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                      offset: const Offset(4, 4),
+                      blurRadius: 10,
+                    ),
+                    const BoxShadow(
+                      color: Colors.white,
+                      offset: Offset(-4, -4),
+                      blurRadius: 10,
+                    ),
+                  ],
+                  border: Border.all(color: Colors.white, width: 1),
                 ),
-                child: const Icon(
-                  Icons.book_rounded,
-                  color: AdminColors.purple,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isDeleteMode
-                          ? 'Delete Books (Danger Zone)'
-                          : 'Library Database',
-                      style: GoogleFonts.dmSerifDisplay(
-                        fontSize: 14,
-                        color: isDeleteMode
-                            ? AppColors.error
-                            : LoginColors.accent,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AdminColors.purple.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.book_rounded,
+                        color: AdminColors.purple,
+                        size: 24,
                       ),
                     ),
-                    Text(
-                      book['title'] ?? 'Unknown Title',
-                      style: GoogleFonts.inter(
-                        color: LoginColors.textDark,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Author: ${book['author'] ?? 'Unknown'}',
-                      style: GoogleFonts.inter(
-                        color: LoginColors.textDark.withValues(
-                          alpha: 0.6,
-                        ),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: LoginColors.accent.withValues(
-                              alpha: 0.1,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isDeleteMode
+                                ? 'Delete Books (Danger Zone)'
+                                : 'Library Database',
+                            style: GoogleFonts.dmSerifDisplay(
+                              fontSize: 14,
+                              color: isDeleteMode
+                                  ? AppColors.error
+                                  : LoginColors.accent,
                             ),
-                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(
-                            book['category'] ?? 'General',
+                          Text(
+                            book['title'] ?? 'Unknown Title',
                             style: GoogleFonts.inter(
-                              color: LoginColors.accent,
-                              fontSize: 10,
+                              color: LoginColors.textDark,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Copies: ${book['available_copies'] ?? book['copies'] ?? 1} / ${book['total_copies'] ?? book['copies'] ?? 1}',
+                          const SizedBox(height: 6),
+                          Text(
+                            'Author: ${book['author'] ?? 'Unknown'}',
                             style: GoogleFonts.inter(
                               color: LoginColors.textDark.withValues(
-                                alpha: 0.7,
+                                alpha: 0.6,
                               ),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: LoginColors.accent.withValues(
+                                    alpha: 0.1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  book['category'] ?? 'General',
+                                  style: GoogleFonts.inter(
+                                    color: LoginColors.accent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Copies: ${book['available_copies'] ?? book['copies'] ?? 1} / ${book['total_copies'] ?? book['copies'] ?? 1}',
+                                  style: GoogleFonts.inter(
+                                    color: LoginColors.textDark.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDeleteMode
+                            ? AppColors.error.withValues(alpha: 0.1)
+                            : LoginColors.accent.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          isDeleteMode
+                              ? Icons.delete_forever_rounded
+                              : Icons.edit_rounded,
+                          color: isDeleteMode
+                              ? AppColors.error
+                              : LoginColors.accent,
+                          size: 20,
                         ),
-                      ],
+                        onPressed: () {
+                          if (isDeleteMode) {
+                            _showDeleteBookDialog(book);
+                          } else {
+                            _showEditBookDialog(book);
+                          }
+                        },
+                      ),
                     ),
                   ],
                 ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: isDeleteMode
-                      ? AppColors.error.withValues(alpha: 0.1)
-                      : LoginColors.accent.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    isDeleteMode
-                        ? Icons.delete_forever_rounded
-                        : Icons.edit_rounded,
-                    color: isDeleteMode
-                        ? AppColors.error
-                        : LoginColors.accent,
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    if (isDeleteMode) {
-                      _showDeleteBookDialog(book);
-                    } else {
-                      _showEditBookDialog(book);
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1721,12 +1706,12 @@ class _BooksViewState extends State<BooksView> {
 
   // ── UI HELPER: MENU BUTTONS ──
   Widget _buildMenuButton(
-      int index,
-      String title,
-      String subtitle,
-      IconData icon, {
-        bool isDanger = false,
-      }) {
+    int index,
+    String title,
+    String subtitle,
+    IconData icon, {
+    bool isDanger = false,
+  }) {
     final isSelected = _selectedMenuIndex == index;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1741,17 +1726,17 @@ class _BooksViewState extends State<BooksView> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: isSelected
                 ? [
-              BoxShadow(
-                color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
-                offset: const Offset(4, 4),
-                blurRadius: 10,
-              ),
-              const BoxShadow(
-                color: Colors.white,
-                offset: Offset(-4, -4),
-                blurRadius: 10,
-              ),
-            ]
+                    BoxShadow(
+                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                      offset: const Offset(4, 4),
+                      blurRadius: 10,
+                    ),
+                    const BoxShadow(
+                      color: Colors.white,
+                      offset: Offset(-4, -4),
+                      blurRadius: 10,
+                    ),
+                  ]
                 : [],
           ),
           child: Row(
@@ -1762,8 +1747,8 @@ class _BooksViewState extends State<BooksView> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? (isDanger
-                      ? AppColors.error.withValues(alpha: 0.2)
-                      : LoginColors.accent.withValues(alpha: 0.2))
+                            ? AppColors.error.withValues(alpha: 0.2)
+                            : LoginColors.accent.withValues(alpha: 0.2))
                       : Colors.black.withValues(alpha: 0.05),
                   shape: BoxShape.circle,
                 ),
@@ -1835,7 +1820,10 @@ class _MembersViewState extends State<MembersView> {
   // OTP Verification State
   bool _isAccountCreated = false;
   bool _isVerifyingOtp = false;
-  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController(),);
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
   // Controllers for Add Member Form
@@ -1859,12 +1847,12 @@ class _MembersViewState extends State<MembersView> {
 
     _scrollController.addListener(() {
       if ((_selectedMenuIndex == 0 || _selectedMenuIndex == 2) &&
-          _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+          _scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 50) {
         _fetchMoreMembers();
       }
     });
   }
-
 
   @override
   void dispose() {
@@ -1890,9 +1878,9 @@ class _MembersViewState extends State<MembersView> {
 
     try {
       final data = await _api.getAllMembers(
-          page: 0,
-          size: 5,
-          search: _searchController.text.trim()
+        page: 0,
+        size: 5,
+        search: _searchController.text.trim(),
       );
 
       if (mounted) {
@@ -1916,9 +1904,9 @@ class _MembersViewState extends State<MembersView> {
     try {
       _currentMemberPage++;
       final data = await _api.getAllMembers(
-          page: _currentMemberPage,
-          size: 5,
-          search: _searchController.text.trim()
+        page: _currentMemberPage,
+        size: 5,
+        search: _searchController.text.trim(),
       );
 
       if (mounted) {
@@ -1937,7 +1925,6 @@ class _MembersViewState extends State<MembersView> {
       if (mounted) setState(() => _isFetchingMore = false);
     }
   }
-
 
   Future<void> _handleVerifyOtp() async {
     String otp = _otpControllers.map((c) => c.text.trim()).join();
@@ -1958,12 +1945,7 @@ class _MembersViewState extends State<MembersView> {
 
     if (!mounted) return;
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account Fully Verified and Activated!'),
-          backgroundColor: AdminColors.purple,
-        ),
-      );
+      TopToast.show(context, 'Account Fully Verified and Activated!');
 
       // Reset everything for the next user
       _addNameController.clear();
@@ -1982,12 +1964,7 @@ class _MembersViewState extends State<MembersView> {
         c.clear();
       }
       _otpFocusNodes[0].requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid OTP. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      TopToast.show(context, 'Invalid OTP. Please try again.', isError: true);
     }
   }
 
@@ -1997,12 +1974,8 @@ class _MembersViewState extends State<MembersView> {
 
     if (isSelf) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You cannot change your own role.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      TopToast.show(context, 'You cannot change your own role.', isError: true);
+
       return;
     }
 
@@ -2077,21 +2050,14 @@ class _MembersViewState extends State<MembersView> {
                       await _api.updateUserRole(member['id'], selectedRole);
                       await _fetchMembers();
 
-                      // Using context.mounted fixes the async linter warning!
                       if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Role updated successfully!'),
-                          backgroundColor: AdminColors.purple,
-                        ),
-                      );
+                      TopToast.show(context, 'Role updated successfully!');
                     } catch (e) {
                       if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to update role.'),
-                          backgroundColor: AppColors.error,
-                        ),
+                      TopToast.show(
+                        context,
+                        'Failed to update role.',
+                        isError: true,
                       );
                     }
                   },
@@ -2121,35 +2087,36 @@ class _MembersViewState extends State<MembersView> {
     try {
       final email = _addEmailController.text.trim();
 
-      // 1. Create the user in the database FIRST (they are unverified)
       await _api.addMember(
-        _addNameController.text,
+        _addNameController.text.trim(),
         email,
         _addPasswordController.text,
         _addRole,
       );
 
-      // 2. NOW send the OTP (The backend will successfully find the user!)
       await _api.sendOtp(email);
 
       setState(() {
         _isSubmitting = false;
-        _isAccountCreated = true; // This switches the UI to show the OTP boxes
+        _isAccountCreated = true;
       });
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account Created! OTP sent to email for activation.'),
-          backgroundColor: AdminColors.purple,
-        ),
+      TopToast.show(
+        context,
+        'Account Created! OTP sent to email for activation.',
       );
+    } on DioException catch (e) {
+      setState(() => _isSubmitting = false);
+
+      final msg = e.response?.data['error'] ?? 'Failed to add member.';
+
+      if (!mounted) return;
+      TopToast.show(context, msg, isError: true);
     } catch (e) {
       setState(() => _isSubmitting = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
-      );
+      TopToast.show(context, 'Error: $e', isError: true);
     }
   }
 
@@ -2179,22 +2146,16 @@ class _MembersViewState extends State<MembersView> {
               Navigator.pop(ctx);
               try {
                 await _api.deleteMember(id);
-                await _fetchMembers(); // Refresh the list
+                await _fetchMembers();
 
-                if (!mounted) return; // <--- Prevents async crash
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Member deleted successfully.'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
+                if (!mounted) return;
+                TopToast.show(context, 'Member deleted successfully.');
               } catch (e) {
-                if (!mounted) return; // <--- Prevents async crash
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to delete member.'),
-                    backgroundColor: AppColors.error,
-                  ),
+                if (!mounted) return;
+                TopToast.show(
+                  context,
+                  'Failed to delete member.',
+                  isError: true,
                 );
               }
             },
@@ -2211,81 +2172,133 @@ class _MembersViewState extends State<MembersView> {
     );
   }
 
-// ── UI: NEUMORPHIC MEMBER INFO DIALOG ──
+  // ── UI: NEUMORPHIC MEMBER INFO DIALOG ──
   Future<void> _showMemberInfoDialog(Map<String, dynamic> member) async {
     showDialog(
-        context: context,
-        builder: (ctx) {
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            insetPadding: const EdgeInsets.all(24),
-            child: Container(
-              width: 400,
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: LoginColors.cardBase, // Must match the background perfectly
-                borderRadius: BorderRadius.circular(32),
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.all(24),
+          child: Container(
+            width: 400,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color:
+                  LoginColors.cardBase, // Must match the background perfectly
+              borderRadius: BorderRadius.circular(32),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 3. NEUMORPHIC AVATAR
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: LoginColors.cardBase,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                        offset: const Offset(6, 6),
+                        blurRadius: 12,
+                      ),
+                      const BoxShadow(
+                        color: Colors.white,
+                        offset: Offset(-6, -6),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    (member['name'] ?? 'U')[0].toUpperCase(),
+                    style: GoogleFonts.dmSerifDisplay(
+                      color: LoginColors.accent,
+                      fontSize: 32,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Member Details',
+                  style: GoogleFonts.dmSerifDisplay(
+                    fontSize: 24,
+                    color: LoginColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 28),
 
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 3. NEUMORPHIC AVATAR
-                  Container(
-                    width: 72, height: 72,
+                // Data Rows (Using your existing _buildInfoRow helper!)
+                _buildInfoRow(
+                  Icons.person_rounded,
+                  'Full Name',
+                  member['name'] ?? 'N/A',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.email_rounded,
+                  'Email Address',
+                  member['email'] ?? 'N/A',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.phone_rounded,
+                  'Mobile Number',
+                  member['mobile'] ?? 'Not provided',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.calendar_month_rounded,
+                  'Date of Joining',
+                  member['joined'] ?? 'N/A',
+                ),
+
+                const SizedBox(height: 36),
+
+                // 4. NEUMORPHIC CLOSE BUTTON
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
                       color: LoginColors.cardBase,
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
-                        BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.5), offset: const Offset(6, 6), blurRadius: 12),
-                        const BoxShadow(color: Colors.white, offset: Offset(-6, -6), blurRadius: 12),
+                        BoxShadow(
+                          color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                          offset: const Offset(6, 6),
+                          blurRadius: 12,
+                        ),
+                        const BoxShadow(
+                          color: Colors.white,
+                          offset: Offset(-6, -6),
+                          blurRadius: 12,
+                        ),
                       ],
                     ),
                     alignment: Alignment.center,
-                    child: Text((member['name'] ?? 'U')[0].toUpperCase(), style: GoogleFonts.dmSerifDisplay(color: LoginColors.accent, fontSize: 32)),
-                  ),
-                  const SizedBox(height: 20),
-                  Text('Member Details', style: GoogleFonts.dmSerifDisplay(fontSize: 24, color: LoginColors.textDark)),
-                  const SizedBox(height: 28),
-
-                  // Data Rows (Using your existing _buildInfoRow helper!)
-                  _buildInfoRow(Icons.person_rounded, 'Full Name', member['name'] ?? 'N/A'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(Icons.email_rounded, 'Email Address', member['email'] ?? 'N/A'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(Icons.phone_rounded, 'Mobile Number', member['mobile'] ?? 'Not provided'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(Icons.calendar_month_rounded, 'Date of Joining', member['joined'] ?? 'N/A'),
-
-                  const SizedBox(height: 36),
-
-                  // 4. NEUMORPHIC CLOSE BUTTON
-                  GestureDetector(
-                    onTap: () => Navigator.pop(ctx),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: LoginColors.cardBase,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.5), offset: const Offset(6, 6), blurRadius: 12),
-                          const BoxShadow(color: Colors.white, offset: Offset(-6, -6), blurRadius: 12),
-                        ],
+                    child: Text(
+                      'Close',
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
-                      alignment: Alignment.center,
-                      child: Text('Close', style: GoogleFonts.inter(color: LoginColors.textDark, fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
-                  )
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
-          );
-        }
+          ),
+        );
+      },
     );
   }
 
@@ -2506,12 +2519,14 @@ class _MembersViewState extends State<MembersView> {
               left: 15,
               right: 15,
             ),
-            itemCount: _filteredMembers.length+ (_isFetchingMore ? 1 : 0),
+            itemCount: _filteredMembers.length + (_isFetchingMore ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == _filteredMembers.length) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator(color: LoginColors.accent)),
+                  child: Center(
+                    child: CircularProgressIndicator(color: LoginColors.accent),
+                  ),
                 );
               }
               final member = _filteredMembers[index];
@@ -2771,14 +2786,11 @@ class _MembersViewState extends State<MembersView> {
     );
   }
 
-  // ── Block 3: Add New Member Form (With Scroll & OTP) ──
   Widget _buildAddMemberUi({required bool isMobile}) {
-    // 1. ISOLATE THE FORM CONTENT (Input fields + Button)
     Widget formContent = SingleChildScrollView(
       physics: isMobile
           ? const NeverScrollableScrollPhysics()
           : const BouncingScrollPhysics(),
-      // We add padding inside the scroll view so the shadow/button has room at the bottom.
       padding: const EdgeInsets.only(bottom: 24, left: 4, right: 4, top: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2873,7 +2885,6 @@ class _MembersViewState extends State<MembersView> {
               ),
             ),
           ] else ...[
-            // The OTP Success UI
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -2996,6 +3007,39 @@ class _MembersViewState extends State<MembersView> {
                   ),
                 ),
               ),
+            const SizedBox(height: 32),
+            Center(
+              child: TextButton.icon(
+                onPressed: () async {
+                  try {
+                    await _api.deleteUnverifiedUser(
+                      _addEmailController.text.trim(),
+                    );
+                  } catch (_) {}
+
+                  setState(() {
+                    _isAccountCreated = false;
+                    _isVerifyingOtp = false;
+                    for (var c in _otpControllers) {
+                      c.clear();
+                    }
+                  });
+                },
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.error,
+                  size: 18,
+                ),
+                label: Text(
+                  'Wrong email? Cancel and go back',
+                  style: GoogleFonts.inter(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
           ],
         ],
       ),
@@ -3084,7 +3128,6 @@ class _MembersViewState extends State<MembersView> {
     );
   }
 }
-
 
 class _MemberActionCard extends StatelessWidget {
   final String title;
@@ -3197,7 +3240,6 @@ class _ReportsViewState extends State<ReportsView> {
 
   Timer? _debounce;
 
-
   bool _isLoadingHistory = true;
   List<dynamic> _borrowHistory = [];
 
@@ -3210,7 +3252,8 @@ class _ReportsViewState extends State<ReportsView> {
 
     _scrollController.addListener(() {
       if (_selectedMenuIndex == 1) {
-        if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+        if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 50) {
           _fetchMoreHistory();
         }
       }
@@ -3243,51 +3286,29 @@ class _ReportsViewState extends State<ReportsView> {
     super.dispose();
   }
 
-  // ── SEARCH & FILTER LOGIC ──
-  void _filterDailyLogs() {
-    // If the user is still typing, cancel the old timer.
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-
-      final query = _dailySearchController.text.toLowerCase();
-      setState(() {
-        _filteredDailyLogs = _allDailyLogs.where((log) {
-          final book = (log['book_title'] ?? '').toString().toLowerCase();
-          final member = (log['member_name'] ?? '').toString().toLowerCase();
-          final action = (log['action'] ?? '').toString();
-
-          final matchesSearch = book.contains(query) || member.contains(query);
-          final matchesAction = _filterAction == 'ALL' || action == _filterAction;
-
-          return matchesSearch && matchesAction;
-        }).toList();
-
-        if (_filterSort == 'OLDEST') {
-          _filteredDailyLogs = _filteredDailyLogs.reversed.toList();
-        }
-      });
-    });
-  }
-
-  Future<void> _fetchDailyActivity() async {
+  Future<void> _fetchDailyActivity({DateTime? date}) async {
     setState(() => _isLoadingDaily = true);
 
     try {
       final ApiService api = ApiService();
-      final data = await api.getDailyActivityLogs();
+
+      String? dateString;
+      if (date != null) {
+        dateString =
+            "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      }
+
+      final data = await api.getDailyActivityLogs(date: dateString);
 
       if (data != null && mounted) {
         setState(() {
-          // Map the real database counts
           _todayIssuesCount = data['todayIssues'] ?? 0;
           _todayReturnsCount = data['todayReturns'] ?? 0;
 
-          // Map the real database logs
           final List<dynamic> realLogs = data['logs'] ?? [];
-
           _allDailyLogs = realLogs;
-          _filteredDailyLogs = realLogs;
+
+          _filterDailyLogs();
           _isLoadingDaily = false;
         });
       }
@@ -3297,6 +3318,32 @@ class _ReportsViewState extends State<ReportsView> {
         debugPrint('Error loading daily activity: $e');
       }
     }
+  }
+
+  void _filterDailyLogs() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      final query = _dailySearchController.text.toLowerCase();
+
+      setState(() {
+        _filteredDailyLogs = _allDailyLogs.where((log) {
+          final book = (log['book_title'] ?? '').toString().toLowerCase();
+          final member = (log['member_name'] ?? '').toString().toLowerCase();
+          final action = (log['action'] ?? '').toString();
+
+          final matchesSearch = book.contains(query) || member.contains(query);
+          final matchesAction =
+              _filterAction == 'ALL' || action == _filterAction;
+
+          return matchesSearch && matchesAction;
+        }).toList();
+
+        if (_filterSort == 'OLDEST') {
+          _filteredDailyLogs = _filteredDailyLogs.reversed.toList();
+        }
+      });
+    });
   }
 
   // Fetches the very first batch (Page 0)
@@ -3332,7 +3379,10 @@ class _ReportsViewState extends State<ReportsView> {
     try {
       _currentHistoryPage++;
       final ApiService api = ApiService();
-      final newData = await api.getGlobalBorrowHistory(page: _currentHistoryPage, size: 5);
+      final newData = await api.getGlobalBorrowHistory(
+        page: _currentHistoryPage,
+        size: 5,
+      );
 
       if (mounted) {
         setState(() {
@@ -3357,253 +3407,406 @@ class _ReportsViewState extends State<ReportsView> {
     DateTime tempDate = _filterDate;
 
     await showDialog(
-        context: context,
-        builder: (ctx) {
-          return StatefulBuilder(
-              builder: (context, setDialogState) {
-                return Dialog(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  insetPadding: const EdgeInsets.all(24),
-                  child: Container(
-                    width: 400,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: LoginColors.cardBase,
-                      borderRadius: BorderRadius.circular(32),
-
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              insetPadding: const EdgeInsets.all(24),
+              child: Container(
+                width: 400,
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: LoginColors.cardBase,
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Filter Logs',
+                      style: GoogleFonts.dmSerifDisplay(
+                        fontSize: 24,
+                        color: LoginColors.textDark,
+                      ),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Filter Logs', style: GoogleFonts.dmSerifDisplay(fontSize: 24, color: LoginColors.textDark)),
-                        const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                        // 1. DATE PICKER
-                        Text('Select Date', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        GestureDetector(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: tempDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                              builder: (context, child) => Theme(
-                                data: ThemeData.light().copyWith(colorScheme: const ColorScheme.light(primary: LoginColors.accent)),
-                                child: child!,
+                    // 1. DATE PICKER
+                    Text(
+                      'Select Date',
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark.withValues(alpha: 0.6),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: tempDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          builder: (context, child) => Theme(
+                            data: ThemeData.light().copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: LoginColors.accent,
                               ),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => tempDate = picked);
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.02),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.black.withValues(alpha: 0.05), width: 1.5)
                             ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_month_rounded, color: LoginColors.accent, size: 20),
-                                const SizedBox(width: 12),
-                                Text("${tempDate.day}/${tempDate.month}/${tempDate.year}", style: GoogleFonts.inter(color: LoginColors.textDark, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => tempDate = picked);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            width: 1.5,
                           ),
                         ),
-                        const SizedBox(height: 24),
-
-                        // 2. TRANSACTION TYPE
-                        Text('Transaction Type', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 12,
-                          children: ['ALL', 'ISSUED', 'RETURNED'].map((action) {
-                            final isSelected = tempAction == action;
-                            return ChoiceChip(
-                              label: Text(action, style: GoogleFonts.inter(color: isSelected ? Colors.white : LoginColors.textDark, fontSize: 12, fontWeight: FontWeight.bold)),
-                              selected: isSelected,
-                              selectedColor: LoginColors.accent,
-                              backgroundColor: Colors.black.withValues(alpha: 0.04),
-                              showCheckmark: false,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide.none),
-                              onSelected: (_) => setDialogState(() => tempAction = action),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // 3. SORT ORDER
-                        Text('Sort By Time', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 12,
-                          children: ['LATEST', 'OLDEST'].map((sort) {
-                            final isSelected = tempSort == sort;
-                            return ChoiceChip(
-                              label: Text(sort, style: GoogleFonts.inter(color: isSelected ? Colors.white : LoginColors.textDark, fontSize: 12, fontWeight: FontWeight.bold)),
-                              selected: isSelected,
-                              selectedColor: LoginColors.accent,
-                              backgroundColor: Colors.black.withValues(alpha: 0.04),
-                              showCheckmark: false,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide.none),
-                              onSelected: (_) => setDialogState(() => tempSort = sort),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 36),
-
-                        // 4. APPLY BUTTON
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Save selections back to the main state and run filter!
-                              setState(() {
-                                _filterAction = tempAction;
-                                _filterSort = tempSort;
-                                _filterDate = tempDate;
-                              });
-                              _filterDailyLogs();
-                              Navigator.pop(ctx);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: LoginColors.accent,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_month_rounded,
+                              color: LoginColors.accent,
+                              size: 20,
                             ),
-                            child: Text('Apply Filters', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          ),
-                        )
-                      ],
+                            const SizedBox(width: 12),
+                            Text(
+                              "${tempDate.day}/${tempDate.month}/${tempDate.year}",
+                              style: GoogleFonts.inter(
+                                color: LoginColors.textDark,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              }
-          );
-        }
+                    const SizedBox(height: 24),
+
+                    // 2. TRANSACTION TYPE
+                    Text(
+                      'Transaction Type',
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark.withValues(alpha: 0.6),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      children: ['ALL', 'ISSUED', 'RETURNED'].map((action) {
+                        final isSelected = tempAction == action;
+                        return ChoiceChip(
+                          label: Text(
+                            action,
+                            style: GoogleFonts.inter(
+                              color: isSelected
+                                  ? Colors.white
+                                  : LoginColors.textDark,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: LoginColors.accent,
+                          backgroundColor: Colors.black.withValues(alpha: 0.04),
+                          showCheckmark: false,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide.none,
+                          ),
+                          onSelected: (_) =>
+                              setDialogState(() => tempAction = action),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 3. SORT ORDER
+                    Text(
+                      'Sort By Time',
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark.withValues(alpha: 0.6),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      children: ['LATEST', 'OLDEST'].map((sort) {
+                        final isSelected = tempSort == sort;
+                        return ChoiceChip(
+                          label: Text(
+                            sort,
+                            style: GoogleFonts.inter(
+                              color: isSelected
+                                  ? Colors.white
+                                  : LoginColors.textDark,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: LoginColors.accent,
+                          backgroundColor: Colors.black.withValues(alpha: 0.04),
+                          showCheckmark: false,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide.none,
+                          ),
+                          onSelected: (_) =>
+                              setDialogState(() => tempSort = sort),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 36),
+
+                    // 4. APPLY BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _filterAction = tempAction;
+                            _filterSort = tempSort;
+                            _filterDate = tempDate;
+                          });
+                          _fetchDailyActivity(date: _filterDate);
+                          Navigator.pop(ctx);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: LoginColors.accent,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Text(
+                          'Apply Filters',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   // ── UI: NEUMORPHIC LOG DETAILS DIALOG ──
   Future<void> _showLogDetailsDialog(Map<String, dynamic> log) async {
     final bool isIssue = log['action'] == 'ISSUED';
-    final Color actionColor = isIssue ? LoginColors.accent : const Color(0xFF00B894);
+    final Color actionColor = isIssue
+        ? LoginColors.accent
+        : const Color(0xFF00B894);
     final double fine = (log['fine'] as num?)?.toDouble() ?? 0.0;
 
     showDialog(
-        context: context,
-        builder: (ctx) {
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            insetPadding: const EdgeInsets.all(24),
-            child: Container(
-              width: 420,
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: LoginColors.cardBase,
-                borderRadius: BorderRadius.circular(32),
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.all(24),
+          child: Container(
+            width: 420,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: LoginColors.cardBase,
+              borderRadius: BorderRadius.circular(32),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header Icon
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: LoginColors.cardBase,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                        offset: const Offset(6, 6),
+                        blurRadius: 12,
+                      ),
+                      const BoxShadow(
+                        color: Colors.white,
+                        offset: Offset(-6, -6),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    isIssue
+                        ? Icons.outbox_rounded
+                        : Icons.move_to_inbox_rounded,
+                    color: actionColor,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Transaction Details',
+                  style: GoogleFonts.dmSerifDisplay(
+                    fontSize: 22,
+                    color: LoginColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: actionColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    log['action'] ?? 'UNKNOWN',
+                    style: GoogleFonts.inter(
+                      color: actionColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
 
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header Icon
-                  Container(
-                    padding: const EdgeInsets.all(20),
+                // Data Rows
+                _buildInfoRow(
+                  Icons.book_rounded,
+                  'Book Title',
+                  log['book_title'] ?? 'N/A',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.person_rounded,
+                  'Member Name',
+                  log['member_name'] ?? 'N/A',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.email_rounded,
+                  'Email Address',
+                  log['email'] ?? 'N/A',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.phone_rounded,
+                  'Contact Number',
+                  log['contact'] ?? 'N/A',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.calendar_today_rounded,
+                  'Issued Date',
+                  log['issued_date'] ?? 'N/A',
+                ),
+                const Divider(height: 24, color: Colors.black12),
+
+                _buildInfoRow(
+                  Icons.event_available_rounded,
+                  'Returned Date',
+                  log['returned_date'] ?? 'Pending',
+                  valueColor: log['returned_date'] == 'Pending'
+                      ? AppColors.error
+                      : LoginColors.textDark,
+                ),
+
+                // Show Fine only if it exists
+                if (fine > 0) ...[
+                  const Divider(height: 24, color: Colors.black12),
+                  _buildInfoRow(
+                    Icons.payments_rounded,
+                    'Calculated Fine',
+                    '₹${fine.toStringAsFixed(2)}',
+                    valueColor: AppColors.error,
+                  ),
+                ],
+
+                const SizedBox(height: 36),
+
+                // Close Button
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
                       color: LoginColors.cardBase,
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                            color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
-                            offset: const Offset(6, 6),
-                            blurRadius: 12
+                          color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                          offset: const Offset(6, 6),
+                          blurRadius: 12,
                         ),
                         const BoxShadow(
-                            color: Colors.white,
-                            offset: Offset(-6, -6),
-                            blurRadius: 12
+                          color: Colors.white,
+                          offset: Offset(-6, -6),
+                          blurRadius: 12,
                         ),
                       ],
                     ),
-                    child: Icon(isIssue ? Icons.outbox_rounded : Icons.move_to_inbox_rounded, color: actionColor, size: 32),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Transaction Details', style: GoogleFonts.dmSerifDisplay(fontSize: 22, color: LoginColors.textDark)),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: actionColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                    child: Text(log['action'] ?? 'UNKNOWN', style: GoogleFonts.inter(color: actionColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 28),
-
-                  // Data Rows
-                  _buildInfoRow(Icons.book_rounded, 'Book Title', log['book_title'] ?? 'N/A'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(Icons.person_rounded, 'Member Name', log['member_name'] ?? 'N/A'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(Icons.email_rounded, 'Email Address', log['email'] ?? 'N/A'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(Icons.phone_rounded, 'Contact Number', log['contact'] ?? 'N/A'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(Icons.calendar_today_rounded, 'Issued Date', log['issued_date'] ?? 'N/A'),
-                  const Divider(height: 24, color: Colors.black12),
-
-                  _buildInfoRow(
-                      Icons.event_available_rounded,
-                      'Returned Date',
-                      log['returned_date'] ?? 'Pending',
-                      valueColor: log['returned_date'] == 'Pending' ? AppColors.error : LoginColors.textDark
-                  ),
-
-                  // Show Fine only if it exists
-                  if (fine > 0) ...[
-                    const Divider(height: 24, color: Colors.black12),
-                    _buildInfoRow(Icons.payments_rounded, 'Calculated Fine', '₹${fine.toStringAsFixed(2)}', valueColor: AppColors.error),
-                  ],
-
-                  const SizedBox(height: 36),
-
-                  // Close Button
-                  GestureDetector(
-                    onTap: () => Navigator.pop(ctx),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: LoginColors.cardBase,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.5), offset: const Offset(6, 6), blurRadius: 12),
-                          const BoxShadow(color: Colors.white, offset: Offset(-6, -6), blurRadius: 12),
-                        ],
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Close',
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
-                      alignment: Alignment.center,
-                      child: Text('Close', style: GoogleFonts.inter(color: LoginColors.textDark, fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
-                  )
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
-          );
-        }
+          ),
+        );
+      },
     );
   }
 
   // Small helper widget for the dialog rows
-  Widget _buildInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3613,9 +3816,23 @@ class _ReportsViewState extends State<ReportsView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  color: LoginColors.textDark.withValues(alpha: 0.5),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(value, style: GoogleFonts.inter(color: valueColor ?? LoginColors.textDark, fontSize: 14, fontWeight: FontWeight.w600)),
+              Text(
+                value,
+                style: GoogleFonts.inter(
+                  color: valueColor ?? LoginColors.textDark,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -3623,108 +3840,217 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-
   // ── UI: DAILY ACTIVITY LOGS (From Wireframe) ──
   Widget _buildDailyActivityUi({required bool isMobile}) {
-    if (_isLoadingDaily) return const Center(child: CircularProgressIndicator(color: LoginColors.accent));
+    if (_isLoadingDaily)
+      return const Center(
+        child: CircularProgressIndicator(color: LoginColors.accent),
+      );
 
     // 1. The Summary Cards (Top Row)
     Widget summaryCards = Row(
       children: [
-        Expanded(child: _buildSummaryCard('Today\'s Issues', _todayIssuesCount.toString(), LoginColors.accent, Icons.outbox_rounded)),
+        Expanded(
+          child: _buildSummaryCard(
+            'Today\'s Issues',
+            _todayIssuesCount.toString(),
+            LoginColors.accent,
+            Icons.outbox_rounded,
+          ),
+        ),
         const SizedBox(width: 16),
-        Expanded(child: _buildSummaryCard('Today\'s Returns', _todayReturnsCount.toString(), const Color(0xFF00B894), Icons.move_to_inbox_rounded)),
+        Expanded(
+          child: _buildSummaryCard(
+            'Today\'s Returns',
+            _todayReturnsCount.toString(),
+            const Color(0xFF00B894),
+            Icons.move_to_inbox_rounded,
+          ),
+        ),
       ],
     );
 
     // 2. The Search Bar
     Widget searchBar = Container(
       decoration: BoxDecoration(
-        color: LoginColors.cardBase, borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.05), width: 1.5),
+        color: LoginColors.cardBase,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.05),
+          width: 1.5,
+        ),
       ),
       child: TextField(
         controller: _dailySearchController,
-        style: GoogleFonts.inter(color: LoginColors.textDark, fontWeight: FontWeight.w500),
+        style: GoogleFonts.inter(
+          color: LoginColors.textDark,
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
           hintText: 'Search logs by book or member...',
-          hintStyle: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.4)),
+          hintStyle: GoogleFonts.inter(
+            color: LoginColors.textDark.withValues(alpha: 0.4),
+          ),
           prefixIcon: const Icon(Icons.search, color: LoginColors.accent),
-          suffixIcon: IconButton(icon: const Icon(Icons.tune_rounded, color: LoginColors.accent), onPressed:_showFilterDialog,), // Filter Icon from wireframe
-          filled: true, fillColor: Colors.black.withValues(alpha: 0.02),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.tune_rounded, color: LoginColors.accent),
+            onPressed: _showFilterDialog,
+          ), // Filter Icon from wireframe
+          filled: true,
+          fillColor: Colors.black.withValues(alpha: 0.02),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
 
     // 3. The List View
     Widget listContent = _filteredDailyLogs.isEmpty
-        ? Center(child: Padding(padding: const EdgeInsets.all(32.0), child: Text('No activity found.', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.4)))))
-        : ListView.builder(
-      physics: isMobile ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
-      shrinkWrap: isMobile,
-      padding: const EdgeInsets.only(bottom: 20, top: 8, left: 12, right: 12),
-      itemCount: _filteredDailyLogs.length,
-      itemBuilder: (context, index) {
-        final log = _filteredDailyLogs[index];
-        final isIssue = log['action'] == 'ISSUED';
-        final actionColor = isIssue ? LoginColors.accent : const Color(0xFF00B894);
-
-        return MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: () => _showLogDetailsDialog(log),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 20),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: LoginColors.cardBase, borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.4), offset: const Offset(3, 3), blurRadius: 8),
-                  const BoxShadow(color: Colors.white, offset: Offset(-3, -3), blurRadius: 8),
-                ],
-                border: Border.all(color: Colors.white, width: 1),
+        ? Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'No activity found.',
+                style: GoogleFonts.inter(
+                  color: LoginColors.textDark.withValues(alpha: 0.4),
+                ),
               ),
-              child: Row(
-                children: [
-                  // Status Indicator Dot
-                  Container(width: 5, height: 40, decoration: BoxDecoration(color: actionColor, borderRadius: BorderRadius.circular(4))),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          )
+        : ListView.builder(
+            physics: isMobile
+                ? const NeverScrollableScrollPhysics()
+                : const BouncingScrollPhysics(),
+            shrinkWrap: isMobile,
+            padding: const EdgeInsets.only(
+              bottom: 20,
+              top: 8,
+              left: 12,
+              right: 12,
+            ),
+            itemCount: _filteredDailyLogs.length,
+            itemBuilder: (context, index) {
+              final log = _filteredDailyLogs[index];
+              final isIssue = log['action'] == 'ISSUED';
+              final actionColor = isIssue
+                  ? LoginColors.accent
+                  : const Color(0xFF00B894);
+
+              return MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => _showLogDetailsDialog(log),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: LoginColors.cardBase,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                          offset: const Offset(3, 3),
+                          blurRadius: 8,
+                        ),
+                        const BoxShadow(
+                          color: Colors.white,
+                          offset: Offset(-3, -3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                      border: Border.all(color: Colors.white, width: 1),
+                    ),
+                    child: Row(
                       children: [
-                        Text(log['book_title'] ?? '', style: GoogleFonts.inter(color: LoginColors.textDark, fontSize: 15, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text(log['member_name'] ?? '', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 13)),
+                        // Status Indicator Dot
+                        Container(
+                          width: 5,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: actionColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                log['book_title'] ?? '',
+                                style: GoogleFonts.inter(
+                                  color: LoginColors.textDark,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                log['member_name'] ?? '',
+                                style: GoogleFonts.inter(
+                                  color: LoginColors.textDark.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: actionColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                log['action'] ?? '',
+                                style: GoogleFonts.inter(
+                                  color: actionColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              log['time'] ?? '',
+                              style: GoogleFonts.inter(
+                                color: LoginColors.textDark.withValues(
+                                  alpha: 0.5,
+                                ),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: actionColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                        child: Text(log['action'] ?? '', style: GoogleFonts.inter(color: actionColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(log['time'] ?? '', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.5), fontSize: 11)),
-                    ],
-                  )
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+                ),
+              );
+            },
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        Text('Daily Activity Logs', style: GoogleFonts.dmSerifDisplay(color: LoginColors.textDark, fontSize: 20)),
+        Text(
+          'Daily Activity Logs',
+          style: GoogleFonts.dmSerifDisplay(
+            color: LoginColors.textDark,
+            fontSize: 20,
+          ),
+        ),
         const SizedBox(height: 16),
         summaryCards,
         const SizedBox(height: 24),
@@ -3736,15 +4062,29 @@ class _ReportsViewState extends State<ReportsView> {
   }
 
   // Helper Widget for the Top Cards
-  Widget _buildSummaryCard(String title, String count, Color color, IconData icon) {
+  Widget _buildSummaryCard(
+    String title,
+    String count,
+    Color color,
+    IconData icon,
+  ) {
     return Container(
       // 1. Slightly reduced padding so the text has more breathing room on mobile
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: LoginColors.cardBase, borderRadius: BorderRadius.circular(20),
+        color: LoginColors.cardBase,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.4), offset: const Offset(4, 4), blurRadius: 10),
-          const BoxShadow(color: Colors.white, offset: Offset(-4, -4), blurRadius: 10),
+          BoxShadow(
+            color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+            offset: const Offset(4, 4),
+            blurRadius: 10,
+          ),
+          const BoxShadow(
+            color: Colors.white,
+            offset: Offset(-4, -4),
+            blurRadius: 10,
+          ),
         ],
         border: Border.all(color: Colors.white, width: 1),
       ),
@@ -3759,9 +4099,9 @@ class _ReportsViewState extends State<ReportsView> {
                 child: Text(
                   title,
                   style: GoogleFonts.inter(
-                      color: LoginColors.textDark.withValues(alpha: 0.6),
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold
+                    color: LoginColors.textDark.withValues(alpha: 0.6),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -3772,116 +4112,232 @@ class _ReportsViewState extends State<ReportsView> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(count, style: GoogleFonts.dmSerifDisplay(color: color, fontSize: 32)),
+          Text(
+            count,
+            style: GoogleFonts.dmSerifDisplay(color: color, fontSize: 32),
+          ),
         ],
       ),
     );
   }
 
-
   // ── UI: THE BORROW HISTORY LOG (Imported from Members) ──
   Widget _buildHistoryUi({required bool isMobile}) {
-    if (_isLoadingHistory) return const Center(child: CircularProgressIndicator(color: LoginColors.accent));
+    if (_isLoadingHistory)
+      return const Center(
+        child: CircularProgressIndicator(color: LoginColors.accent),
+      );
 
     Widget listContent = _borrowHistory.isEmpty
-        ? Center(child: Text('No borrow history found.', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.4), fontSize: 13)))
-        : ListView.builder(
-      physics: isMobile ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
-      shrinkWrap: isMobile,
-      padding: const EdgeInsets.only(bottom: 20, top: 14, left: 14, right: 14),
-      itemCount: _borrowHistory.length + (_isFetchingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == _borrowHistory.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator(color: LoginColors.accent)),
-          );
-        }
-        final record = _borrowHistory[index];
-        final String status = record['status'] ?? 'ACTIVE';
-
-        Color statusColor = LoginColors.accent;
-        if (status == 'OVERDUE') statusColor = AppColors.error;
-        if (status == 'RETURNED') statusColor = LoginColors.textDark.withValues(alpha: 0.4);
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: LoginColors.cardBase,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.4), offset: const Offset(4, 4), blurRadius: 10),
-              const BoxShadow(color: Colors.white, offset: Offset(-4, -4), blurRadius: 10),
-            ],
-            border: Border.all(color: Colors.white, width: 1),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: Icon(Icons.menu_book_rounded, color: statusColor, size: 24),
+        ? Center(
+            child: Text(
+              'No borrow history found.',
+              style: GoogleFonts.inter(
+                color: LoginColors.textDark.withValues(alpha: 0.4),
+                fontSize: 13,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
+            ),
+          )
+        : ListView.builder(
+            controller: isMobile ? null : _scrollController,
+            physics: isMobile
+                ? const NeverScrollableScrollPhysics()
+                : const BouncingScrollPhysics(),
+            shrinkWrap: isMobile,
+            padding: const EdgeInsets.only(
+              bottom: 20,
+              top: 14,
+              left: 14,
+              right: 14,
+            ),
+            itemCount: _borrowHistory.length + (_isFetchingMore ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == _borrowHistory.length) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: CircularProgressIndicator(color: LoginColors.accent),
+                  ),
+                );
+              }
+              final record = _borrowHistory[index];
+              final String status = record['status'] ?? 'ACTIVE';
+
+              Color statusColor = LoginColors.accent;
+              if (status == 'OVERDUE') statusColor = AppColors.error;
+              if (status == 'RETURNED')
+                statusColor = LoginColors.textDark.withValues(alpha: 0.4);
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: LoginColors.cardBase,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                      offset: const Offset(4, 4),
+                      blurRadius: 10,
+                    ),
+                    const BoxShadow(
+                      color: Colors.white,
+                      offset: Offset(-4, -4),
+                      blurRadius: 10,
+                    ),
+                  ],
+                  border: Border.all(color: Colors.white, width: 1),
+                ),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(record['title'] ?? 'Title N/A', style: GoogleFonts.inter(color: LoginColors.textDark, fontSize: 15, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    // New field indicating WHO borrowed it
-                    Text('Borrowed by: ${record['member_name'] ?? 'Unknown'}', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 13)),
-                    const SizedBox(height: 8),
-
-                    Wrap(
-                      spacing: 12, runSpacing: 4,
-                      children: [
-                        Text('Issued: ${record['issued_at']}', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 12)),
-                        Text('Due: ${record['due_date']}', style: GoogleFonts.inter(
-                            color: status == 'OVERDUE' ? AppColors.error : LoginColors.textDark.withValues(alpha: 0.6),
-                            fontSize: 12, fontWeight: status == 'OVERDUE' ? FontWeight.bold : FontWeight.normal
-                        )),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.menu_book_rounded,
+                        color: statusColor,
+                        size: 24,
+                      ),
                     ),
-                    if (status == 'RETURNED' && record['returned_at'] != null) ...[
-                      const SizedBox(height: 4),
-                      Text('Returned On: ${record['returned_at']}', style: GoogleFonts.inter(color: const Color(0xFF00B894), fontSize: 12, fontWeight: FontWeight.w600)),
-                    ],
-
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12, crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: statusColor.withValues(alpha: 0.2))
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            record['title'] ?? 'Title N/A',
+                            style: GoogleFonts.inter(
+                              color: LoginColors.textDark,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          child: Text(status, style: GoogleFonts.inter(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                        if ((record['fine_amount'] as num?) != null && (record['fine_amount'] as num) > 0)
-                          Text('Fine: ₹${record['fine_amount']}', style: GoogleFonts.inter(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.bold)),
-                      ],
-                    )
+                          const SizedBox(height: 4),
+                          // New field indicating WHO borrowed it
+                          Text(
+                            'Borrowed by: ${record['member_name'] ?? 'Unknown'}',
+                            style: GoogleFonts.inter(
+                              color: LoginColors.textDark.withValues(
+                                alpha: 0.6,
+                              ),
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                'Issued: ${record['issued_at']}',
+                                style: GoogleFonts.inter(
+                                  color: LoginColors.textDark.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                'Due: ${record['due_date']}',
+                                style: GoogleFonts.inter(
+                                  color: status == 'OVERDUE'
+                                      ? AppColors.error
+                                      : LoginColors.textDark.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                  fontSize: 12,
+                                  fontWeight: status == 'OVERDUE'
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (status == 'RETURNED' &&
+                              record['returned_at'] != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Returned On: ${record['returned_at']}',
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF00B894),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: statusColor.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Text(
+                                  status,
+                                  style: GoogleFonts.inter(
+                                    color: statusColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              if ((record['fine_amount'] as num?) != null &&
+                                  (record['fine_amount'] as num) > 0)
+                                Text(
+                                  'Fine: ₹${record['fine_amount']}',
+                                  style: GoogleFonts.inter(
+                                    color: AppColors.error,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        Text('Global Borrow History', style: GoogleFonts.dmSerifDisplay(color: LoginColors.textDark, fontSize: 20)),
+        Text(
+          'Global Borrow History',
+          style: GoogleFonts.dmSerifDisplay(
+            color: LoginColors.textDark,
+            fontSize: 20,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text('System-wide log of all issued and returned books.', style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 13)),
+        Text(
+          'System-wide log of all issued and returned books.',
+          style: GoogleFonts.inter(
+            color: LoginColors.textDark.withValues(alpha: 0.6),
+            fontSize: 13,
+          ),
+        ),
         const SizedBox(height: 24),
         isMobile ? listContent : Expanded(child: listContent),
       ],
@@ -3891,9 +4347,12 @@ class _ReportsViewState extends State<ReportsView> {
   // ── ROUTER ──
   Widget _buildRightContent(bool isMobile) {
     switch (_selectedMenuIndex) {
-      case 0: return _buildDailyActivityUi(isMobile: isMobile);
-      case 1: return _buildHistoryUi(isMobile: isMobile);
-      default: return const SizedBox.shrink();
+      case 0:
+        return _buildDailyActivityUi(isMobile: isMobile);
+      case 1:
+        return _buildHistoryUi(isMobile: isMobile);
+      default:
+        return const SizedBox.shrink();
     }
   }
 
@@ -3906,17 +4365,23 @@ class _ReportsViewState extends State<ReportsView> {
       children: [
         // 1. Daily Activity is now Index 0
         _ReportActionCard(
-            title: 'Daily Activity Logs', subtitle: 'Today\'s Issues & Returns',
-            icon: Icons.today_rounded, color: LoginColors.accent,
-            isSelected: _selectedMenuIndex == 0, onTap: () => setState(() => _selectedMenuIndex = 0)
+          title: 'Daily Activity Logs',
+          subtitle: 'Today\'s Issues & Returns',
+          icon: Icons.today_rounded,
+          color: LoginColors.accent,
+          isSelected: _selectedMenuIndex == 0,
+          onTap: () => setState(() => _selectedMenuIndex = 0),
         ),
         const SizedBox(height: 16),
 
         // 2. Borrow History is now Index 1
         _ReportActionCard(
-            title: 'Borrow History Log', subtitle: 'View all system records',
-            icon: Icons.history_rounded, color: LoginColors.accent,
-            isSelected: _selectedMenuIndex == 1, onTap: () => setState(() => _selectedMenuIndex = 1)
+          title: 'Borrow History Log',
+          subtitle: 'View all system records',
+          icon: Icons.history_rounded,
+          color: LoginColors.accent,
+          isSelected: _selectedMenuIndex == 1,
+          onTap: () => setState(() => _selectedMenuIndex = 1),
         ),
       ],
     );
@@ -3924,16 +4389,28 @@ class _ReportsViewState extends State<ReportsView> {
     // RIGHT CONTENT AREA
     Widget mainContentArea = Container(
       decoration: BoxDecoration(
-        color: LoginColors.cardBase, borderRadius: BorderRadius.circular(24),
+        color: LoginColors.cardBase,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.5), offset: const Offset(8, 8), blurRadius: 20),
-          const BoxShadow(color: Colors.white, offset: Offset(-8, -8), blurRadius: 20),
+          BoxShadow(
+            color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+            offset: const Offset(8, 8),
+            blurRadius: 20,
+          ),
+          const BoxShadow(
+            color: Colors.white,
+            offset: Offset(-8, -8),
+            blurRadius: 20,
+          ),
         ],
       ),
       padding: const EdgeInsets.all(24),
       child: Align(
         alignment: Alignment.topLeft,
-        child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: _buildRightContent(isMobile)),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: _buildRightContent(isMobile),
+        ),
       ),
     );
 
@@ -3947,16 +4424,22 @@ class _ReportsViewState extends State<ReportsView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-                padding: const EdgeInsets.only(left: 4.0),
-                child: Text('Reports & Logs', style: GoogleFonts.dmSerifDisplay(fontSize: 22, color: LoginColors.textDark))
+              padding: const EdgeInsets.only(left: 4.0),
+              child: Text(
+                'Reports & Logs',
+                style: GoogleFonts.dmSerifDisplay(
+                  fontSize: 22,
+                  color: LoginColors.textDark,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             menuButtons,
             const SizedBox(height: 32),
             Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                constraints: const BoxConstraints(minHeight: 500),
-                child: mainContentArea
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              constraints: const BoxConstraints(minHeight: 500),
+              child: mainContentArea,
             ),
           ],
         ),
@@ -3966,7 +4449,16 @@ class _ReportsViewState extends State<ReportsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(padding: const EdgeInsets.only(left: 4.0), child: Text('Reports & Logs', style: GoogleFonts.dmSerifDisplay(fontSize: 22, color: LoginColors.textDark))),
+        Padding(
+          padding: const EdgeInsets.only(left: 4.0),
+          child: Text(
+            'Reports & Logs',
+            style: GoogleFonts.dmSerifDisplay(
+              fontSize: 22,
+              color: LoginColors.textDark,
+            ),
+          ),
+        ),
         const SizedBox(height: 16),
         Expanded(
           child: Row(
@@ -3984,10 +4476,21 @@ class _ReportsViewState extends State<ReportsView> {
 }
 
 class _ReportActionCard extends StatelessWidget {
-  final String title; final String subtitle; final IconData icon;
-  final Color color; final bool isSelected; final VoidCallback onTap;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
 
-  const _ReportActionCard({required this.title, required this.subtitle, required this.icon, required this.color, required this.isSelected, required this.onTap});
+  const _ReportActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -3998,28 +4501,64 @@ class _ReportActionCard extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: LoginColors.cardBase, borderRadius: BorderRadius.circular(16),
-            boxShadow: isSelected ? [
-              BoxShadow(color: const Color(0xFFA3B1C6).withValues(alpha: 0.5), offset: const Offset(5, 5), blurRadius: 10),
-              const BoxShadow(color: Colors.white, offset: Offset(-5, -5), blurRadius: 10),
-            ] : [],
+            color: LoginColors.cardBase,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                      offset: const Offset(5, 5),
+                      blurRadius: 10,
+                    ),
+                    const BoxShadow(
+                      color: Colors.white,
+                      offset: Offset(-5, -5),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : [],
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: isSelected ? color.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, size: 22, color: isSelected ? color : LoginColors.textDark.withValues(alpha: 0.4)),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? color.withValues(alpha: 0.15)
+                      : Colors.black.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: isSelected
+                      ? color
+                      : LoginColors.textDark.withValues(alpha: 0.4),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(title, style: GoogleFonts.inter(color: LoginColors.textDark, fontSize: 14, fontWeight: FontWeight.bold)),
+                    Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: GoogleFonts.inter(color: LoginColors.textDark.withValues(alpha: 0.6), fontSize: 10)),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        color: LoginColors.textDark.withValues(alpha: 0.6),
+                        fontSize: 10,
+                      ),
+                    ),
                   ],
                 ),
               ),

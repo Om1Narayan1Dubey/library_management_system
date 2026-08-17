@@ -1,38 +1,34 @@
+// lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
+
 import 'admin/admin_home_screen.dart';
 import 'staff/staff_home_screen.dart';
 import 'student/student_home_screen.dart';
 
-class HomeScreen extends StatelessWidget {
-  final String username;
-  final String role;
-  final String email;
 
-  const HomeScreen({
-    super.key,
-    required this.username,
-    required this.role,
-    required this.email,
-  });
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+
+    final user = ref.watch(currentUserProvider);
+
+
+    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+    final role = user['role'] ?? 'MEMBER';
+
+
     switch (role) {
       case 'ADMIN':
-        return AdminHomeScreen(
-          username: username,
-          email: email,
-        );
+        return const AdminHomeScreen();
       case 'LIBRARIAN':
-        return StaffHomeScreen(
-          username: username,
-          email: email,
-        );
+        return const StaffHomeScreen();
       default:
-        return StudentHomeScreen(
-          username: username,
-          email: email,
-        );
+        return const StudentHomeScreen();
     }
   }
 }

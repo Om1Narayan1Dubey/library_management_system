@@ -8,15 +8,18 @@ import '../utils/validators.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
 import '../utils/top_toast.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
 
-class LoginScreen extends StatefulWidget {
+
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey      = GlobalKey<FormState>();
   final _emailCtrl    = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -44,12 +47,12 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordCtrl.text,
       );
       if (!mounted) return;
+
+      ref.read(currentUserProvider.notifier).state = response;
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => HomeScreen(
-            username: response['username'] ?? '',
-            role:     response['role'] ?? 'MEMBER',
-            email:    response['email'] ?? '',
           ),
         ),
       );
