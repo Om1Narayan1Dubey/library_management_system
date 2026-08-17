@@ -10,22 +10,24 @@ import '../utils/validators.dart';
 import '../widgets/otp_input_widget.dart';
 import 'login_screen.dart';
 import '../utils/top_toast.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/api_provider.dart';
 
-class RegisterScreen extends StatefulWidget {
+
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey     = GlobalKey<FormState>();
   final _userCtrl    = TextEditingController();
   final _emailCtrl   = TextEditingController();
   final _passCtrl    = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _mobileCtrl  = TextEditingController();
-  final _api         = ApiService();
 
   bool   _otpSent     = false;
   bool   _otpVerified = false;
@@ -78,7 +80,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _sendingOtp = true);
     try {
-      await _api.sendOtp(_emailCtrl.text.trim());
+      await ref.read(apiProvider).sendOtp(_emailCtrl.text.trim());
       setState(() {
         _otpSent    = true;
         _otpCode    = '';
@@ -115,14 +117,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _loading = true);
     try {
-      await _api.register(
+      await ref.read(apiProvider).register(
         username: _userCtrl.text.trim(),
         email:    _emailCtrl.text.trim(),
         password: _passCtrl.text,
         mobile:   _mobileCtrl.text.trim(),
       );
 
-      await _api.verifyOtp(
+      await ref.read(apiProvider).verifyOtp(
         email:   _emailCtrl.text.trim(),
         otpCode: _otpCode,
       );
@@ -143,7 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           msg.toLowerCase().contains('incorrect') ||
           msg.toLowerCase().contains('expired')) {
         try {
-          await _api.deleteUnverifiedUser(_emailCtrl.text.trim());
+          await ref.read(apiProvider).deleteUnverifiedUser(_emailCtrl.text.trim());
           setState(() {
             _otpCode    = '';
             _otpVerified = false;

@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import '../../utils/top_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/api_provider.dart';
 
 // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 // 🟩🟩🟩🟩🟩             MAIN ADMIN LAYOUT             🟩🟩🟩🟩🟩
@@ -25,11 +26,10 @@ class AdminHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
-  final _api = ApiService();
 
   Future<void> _signOut() async {
     final navigator = Navigator.of(context);
-    await _api.logout();
+    await ref.read(apiProvider).logout();
     navigator.pushReplacement(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
@@ -88,7 +88,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     switch (currentIndex) {
       case 0: return const DashboardView();
       case 1: return const BooksView();
-      case 2: return MembersView(adminEmail: email); // Pass the vault email here
+      case 2: return MembersView(adminEmail: email);
       case 3: return const ReportsView();
       default: return const DashboardView();
     }
@@ -369,19 +369,18 @@ class _TopBarBtn extends StatelessWidget {
 // 🟨🟨🟨🟨🟨              1. DASHBOARD VIEW                 🟨🟨🟨🟨🟨
 // 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
 
-class DashboardView extends StatefulWidget {
+class DashboardView extends ConsumerStatefulWidget {
   const DashboardView({super.key});
   @override
-  State<DashboardView> createState() => _DashboardViewState();
+  ConsumerState<DashboardView> createState() => _DashboardViewState();
 }
 
-class _DashboardViewState extends State<DashboardView> {
-  final ApiService _api = ApiService();
+class _DashboardViewState extends ConsumerState<DashboardView> {
   bool _isLoading = true;
   Map<String, dynamic>? _stats;
   String _errorMessage = '';
 
-  int _selectedStatIndex = 0; // 0=Users, 1=Books, 2=Issued, 3=Overdue
+  int _selectedStatIndex = 0;
 
   @override
   void initState() {
@@ -393,7 +392,7 @@ class _DashboardViewState extends State<DashboardView> {
     try {
       if (mounted) setState(() => _isLoading = true);
 
-      final data = await _api.getDashboardStats();
+      final data = await ref.read(apiProvider).getDashboardStats();
 
       if (mounted) {
         setState(() {
@@ -856,16 +855,16 @@ class _SelectableStatCard extends StatelessWidget {
 // 🟦🟦🟦🟦🟦               2. BOOKS VIEW               🟦🟦🟦🟦🟦
 // 🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦
 
-class BooksView extends StatefulWidget {
+class BooksView extends ConsumerStatefulWidget {
   const BooksView({super.key});
 
   @override
-  State<BooksView> createState() => _BooksViewState();
+  ConsumerState<BooksView> createState() => _BooksViewState();
 }
 
-class _BooksViewState extends State<BooksView> {
+class _BooksViewState extends ConsumerState<BooksView> {
   // ── STATE VARIABLES ──
-  final ApiService _apiService = ApiService();
+
   int _selectedMenuIndex = 0;
   bool _isSubmitting = false;
   bool _isLoadingBooks = true;
@@ -936,7 +935,7 @@ class _BooksViewState extends State<BooksView> {
     });
 
     try {
-      final data = await _apiService.getAllBooks(
+      final data = await ref.read(apiProvider).getAllBooks(
         page: 0,
         size: 5,
         search: _searchController.text.trim(),
@@ -963,7 +962,7 @@ class _BooksViewState extends State<BooksView> {
     try {
       _currentBookPage++;
       // Changed _api to _apiService
-      final data = await _apiService.getAllBooks(
+      final data = await ref.read(apiProvider).getAllBooks(
         page: _currentBookPage,
         size: 5,
         search: _searchController.text.trim(),
@@ -998,7 +997,7 @@ class _BooksViewState extends State<BooksView> {
 
     setState(() => _isSubmitting = true);
 
-    bool success = await _apiService.addNewBook(
+    bool success = await ref.read(apiProvider).addNewBook(
       title: _titleController.text.trim(),
       author: _authorController.text.trim(),
       isbn: _isbnController.text.trim(),
@@ -1060,7 +1059,7 @@ class _BooksViewState extends State<BooksView> {
               Navigator.pop(ctx);
               setState(() => _isLoadingBooks = true);
 
-              bool success = await _apiService.deleteBook(book['id']);
+              bool success = await ref.read(apiProvider).deleteBook(book['id']);
 
               if (success && mounted) {
                 await _fetchBooks();
@@ -1175,7 +1174,7 @@ class _BooksViewState extends State<BooksView> {
                               ? null
                               : () async {
                                   setDialogState(() => isSaving = true);
-                                  bool success = await _apiService.updateBook(
+                                  bool success = await ref.read(apiProvider).updateBook(
                                     id: book['id'],
                                     title: editTitleController.text,
                                     author: editAuthorController.text,
@@ -1798,16 +1797,15 @@ class _BooksViewState extends State<BooksView> {
 // 🟪🟪🟪🟪🟪                 3. MEMBERS VIEW                🟪🟪🟪🟪🟪
 // 🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
 
-class MembersView extends StatefulWidget {
+class MembersView extends ConsumerStatefulWidget {
   final String adminEmail;
   const MembersView({super.key, required this.adminEmail});
 
   @override
-  State<MembersView> createState() => _MembersViewState();
+  ConsumerState<MembersView> createState() => _MembersViewState();
 }
 
-class _MembersViewState extends State<MembersView> {
-  final ApiService _api = ApiService();
+class _MembersViewState extends ConsumerState<MembersView> {
   final TextEditingController _searchController = TextEditingController();
 
   Timer? _debounce;
@@ -1877,7 +1875,7 @@ class _MembersViewState extends State<MembersView> {
     });
 
     try {
-      final data = await _api.getAllMembers(
+      final data = await ref.read(apiProvider).getAllMembers(
         page: 0,
         size: 5,
         search: _searchController.text.trim(),
@@ -1903,7 +1901,7 @@ class _MembersViewState extends State<MembersView> {
 
     try {
       _currentMemberPage++;
-      final data = await _api.getAllMembers(
+      final data = await ref.read(apiProvider).getAllMembers(
         page: _currentMemberPage,
         size: 5,
         search: _searchController.text.trim(),
@@ -1935,7 +1933,7 @@ class _MembersViewState extends State<MembersView> {
     bool success = false;
     try {
       final email = _addEmailController.text.trim();
-      await _api.verifyOtp(email: email, otpCode: otp);
+      await ref.read(apiProvider).verifyOtp(email: email, otpCode: otp);
       success = true;
     } catch (e) {
       success = false;
@@ -2047,7 +2045,7 @@ class _MembersViewState extends State<MembersView> {
                     if (selectedRole == member['role']) return;
 
                     try {
-                      await _api.updateUserRole(member['id'], selectedRole);
+                      await ref.read(apiProvider).updateUserRole(member['id'], selectedRole);
                       await _fetchMembers();
 
                       if (!context.mounted) return;
@@ -2087,14 +2085,14 @@ class _MembersViewState extends State<MembersView> {
     try {
       final email = _addEmailController.text.trim();
 
-      await _api.addMember(
+      await ref.read(apiProvider).addMember(
         _addNameController.text.trim(),
         email,
         _addPasswordController.text,
         _addRole,
       );
 
-      await _api.sendOtp(email);
+      await ref.read(apiProvider).sendOtp(email);
 
       setState(() {
         _isSubmitting = false;
@@ -2145,7 +2143,7 @@ class _MembersViewState extends State<MembersView> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                await _api.deleteMember(id);
+                await ref.read(apiProvider).deleteMember(id);
                 await _fetchMembers();
 
                 if (!mounted) return;
@@ -3012,7 +3010,7 @@ class _MembersViewState extends State<MembersView> {
               child: TextButton.icon(
                 onPressed: () async {
                   try {
-                    await _api.deleteUnverifiedUser(
+                    await ref.read(apiProvider).deleteUnverifiedUser(
                       _addEmailController.text.trim(),
                     );
                   } catch (_) {}
@@ -3228,14 +3226,14 @@ class _MemberActionCard extends StatelessWidget {
 // 🟧🟧🟧🟧🟧              4. REPORTS VIEW              🟧🟧🟧🟧🟧
 // 🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧
 
-class ReportsView extends StatefulWidget {
+class ReportsView extends ConsumerStatefulWidget {
   const ReportsView({super.key});
 
   @override
-  State<ReportsView> createState() => _ReportsViewState();
+  ConsumerState<ReportsView> createState() => _ReportsViewState();
 }
 
-class _ReportsViewState extends State<ReportsView> {
+class _ReportsViewState extends ConsumerState<ReportsView> {
   int _selectedMenuIndex = 0;
 
   Timer? _debounce;
@@ -3290,7 +3288,6 @@ class _ReportsViewState extends State<ReportsView> {
     setState(() => _isLoadingDaily = true);
 
     try {
-      final ApiService api = ApiService();
 
       String? dateString;
       if (date != null) {
@@ -3298,7 +3295,7 @@ class _ReportsViewState extends State<ReportsView> {
             "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
       }
 
-      final data = await api.getDailyActivityLogs(date: dateString);
+      final data = await ref.read(apiProvider).getDailyActivityLogs(date: dateString);
 
       if (data != null && mounted) {
         setState(() {
@@ -3346,7 +3343,6 @@ class _ReportsViewState extends State<ReportsView> {
     });
   }
 
-  // Fetches the very first batch (Page 0)
   Future<void> _fetchGlobalHistory() async {
     setState(() {
       _isLoadingHistory = true;
@@ -3356,8 +3352,7 @@ class _ReportsViewState extends State<ReportsView> {
     });
 
     try {
-      final ApiService api = ApiService();
-      final data = await api.getGlobalBorrowHistory(page: 0, size: 5);
+      final data = await ref.read(apiProvider).getGlobalBorrowHistory(page: 0, size: 5);
 
       if (mounted) {
         setState(() {
@@ -3378,8 +3373,7 @@ class _ReportsViewState extends State<ReportsView> {
 
     try {
       _currentHistoryPage++;
-      final ApiService api = ApiService();
-      final newData = await api.getGlobalBorrowHistory(
+      final newData = await ref.read(apiProvider).getGlobalBorrowHistory(
         page: _currentHistoryPage,
         size: 5,
       );

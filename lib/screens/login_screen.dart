@@ -10,6 +10,7 @@ import 'home_screen.dart';
 import '../utils/top_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import '../providers/api_provider.dart';
 
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -27,7 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _hidePass  = true;
   bool _remember  = false;
   bool _loading   = false;
-  final _api      = ApiService();
+
 
   @override
   void dispose() {
@@ -42,7 +43,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     setState(() => _loading = true);
     try {
-      final response = await _api.login(
+      final api = ref.read(apiProvider);
+      final response = await api.login(
         email:    _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
