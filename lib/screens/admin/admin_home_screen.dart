@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/api_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/bg_scaffold.dart';
 import '../login_screen.dart';
@@ -11,6 +10,11 @@ import 'package:dio/dio.dart';
 import '../../utils/top_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/api_provider.dart';
+import '../../providers/dashboard_provider.dart';
+import '../../providers/books_provider.dart';
+import '../../providers/members_provider.dart';
+import '../../providers/borrow_history_provider.dart';
+import '../../providers/daily_activity_provider.dart';
 
 // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 // 🟩🟩🟩🟩🟩             MAIN ADMIN LAYOUT             🟩🟩🟩🟩🟩
@@ -26,7 +30,6 @@ class AdminHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
-
   Future<void> _signOut() async {
     final navigator = Navigator.of(context);
     await ref.read(apiProvider).logout();
@@ -86,17 +89,21 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     final email = user?['email'] ?? '';
 
     switch (currentIndex) {
-      case 0: return const DashboardView();
-      case 1: return const BooksView();
-      case 2: return MembersView(adminEmail: email);
-      case 3: return const ReportsView();
-      default: return const DashboardView();
+      case 0:
+        return const DashboardView();
+      case 1:
+        return const BooksView();
+      case 2:
+        return MembersView(adminEmail: email);
+      case 3:
+        return const ReportsView();
+      default:
+        return const DashboardView();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-
     final currentIndex = ref.watch(adminTabProvider);
 
     return BgScaffold(
@@ -158,10 +165,34 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _buildTabItem(0, Icons.dashboard_rounded, 'Dashboard', tabHeight, currentIndex),
-              _buildTabItem(1, Icons.menu_book_rounded, 'Books', tabHeight, currentIndex),
-              _buildTabItem(2, Icons.people_rounded, 'Members', tabHeight, currentIndex),
-              _buildTabItem(3, Icons.bar_chart_rounded, 'Reports', tabHeight, currentIndex),
+              _buildTabItem(
+                0,
+                Icons.dashboard_rounded,
+                'Dashboard',
+                tabHeight,
+                currentIndex,
+              ),
+              _buildTabItem(
+                1,
+                Icons.menu_book_rounded,
+                'Books',
+                tabHeight,
+                currentIndex,
+              ),
+              _buildTabItem(
+                2,
+                Icons.people_rounded,
+                'Members',
+                tabHeight,
+                currentIndex,
+              ),
+              _buildTabItem(
+                3,
+                Icons.bar_chart_rounded,
+                'Reports',
+                tabHeight,
+                currentIndex,
+              ),
             ],
           ),
         ),
@@ -169,11 +200,16 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     );
   }
 
-  Widget _buildTabItem(int index, IconData icon, String label, double height, int currentIndex) {
+  Widget _buildTabItem(
+    int index,
+    IconData icon,
+    String label,
+    double height,
+    int currentIndex,
+  ) {
     final isSelected = currentIndex == index;
 
     return GestureDetector(
-
       onTap: () => ref.read(adminTabProvider.notifier).state = index,
 
       child: AnimatedContainer(
@@ -227,7 +263,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   }
 
   Widget _buildTopBar() {
-
     final user = ref.watch(currentUserProvider);
     final username = user?['username'] ?? 'Admin';
 
@@ -376,56 +411,22 @@ class DashboardView extends ConsumerStatefulWidget {
 }
 
 class _DashboardViewState extends ConsumerState<DashboardView> {
-  bool _isLoading = true;
-  Map<String, dynamic>? _stats;
-  String _errorMessage = '';
-
   int _selectedStatIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchStats();
-  }
-
-  Future<void> _fetchStats() async {
-    try {
-      if (mounted) setState(() => _isLoading = true);
-
-      final data = await ref.read(apiProvider).getDashboardStats();
-
-      if (mounted) {
-        setState(() {
-          _stats = data;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to load dashboard data. Check connection.';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  List<FlSpot> _getRealChartData(int index) {
-    if (_stats == null) return [const FlSpot(0, 0)];
-
+  List<FlSpot> _getRealChartData(int index, Map<String, dynamic> stats) {
     List<dynamic> rawData = [];
     switch (index) {
       case 0:
-        rawData = _stats!['usersChart'] ?? [];
+        rawData = stats['usersChart'] ?? [];
         break;
       case 1:
-        rawData = _stats!['booksChart'] ?? [];
+        rawData = stats['booksChart'] ?? [];
         break;
       case 2:
-        rawData = _stats!['issuedChart'] ?? [];
+        rawData = stats['issuedChart'] ?? [];
         break;
       case 3:
-        rawData = _stats!['overdueChart'] ?? [];
+        rawData = stats['overdueChart'] ?? [];
         break;
     }
 
@@ -438,234 +439,240 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     });
   }
 
-  double _getSmartInterval(int index) {
-    if (_stats == null) return 10;
-    switch (index) {
-      case 0:
-        return 200;
-      case 1:
-        return 1000;
-      case 2:
-        return 50;
-      case 3:
-        return 5;
-      default:
-        return 10;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_isLoading)
-      return const Center(
+    final statsAsync = ref.watch(dashboardStatsProvider);
+
+    return statsAsync.when(
+      loading: () => const Center(
         child: CircularProgressIndicator(color: LoginColors.accent),
-      );
-    if (_errorMessage.isNotEmpty)
-      return Center(
+      ),
+
+      error: (err, stack) => Center(
         child: Text(
-          _errorMessage,
+          'Failed to load dashboard data.',
           style: GoogleFonts.inter(color: AppColors.error),
         ),
-      );
-
-    // ── 1. MEASURE THE SCREEN ──
-    final isMobile = MediaQuery.of(context).size.width < 850;
-
-    // ── 2. THE CARDS MODULE ──
-    Widget leftSideCards = Column(
-      children: [
-        _SelectableStatCard(
-          title: 'Total Users',
-          value: _stats?['totalUsers'].toString() ?? '0',
-          icon: Icons.group,
-          color: AdminColors.purple,
-          isSelected: _selectedStatIndex == 0,
-          onTap: () => setState(() => _selectedStatIndex = 0),
-        ),
-        const SizedBox(height: 20),
-        _SelectableStatCard(
-          title: 'Total Books',
-          value: _stats?['totalBooks'].toString() ?? '0',
-          icon: Icons.library_books,
-          color: AdminColors.purple,
-          isSelected: _selectedStatIndex == 1,
-          onTap: () => setState(() => _selectedStatIndex = 1),
-        ),
-        const SizedBox(height: 20),
-        _SelectableStatCard(
-          title: 'Issued',
-          value: _stats?['currentlyIssued'].toString() ?? '0',
-          icon: Icons.bookmark,
-          color: AdminColors.purple,
-          isSelected: _selectedStatIndex == 2,
-          onTap: () => setState(() => _selectedStatIndex = 2),
-        ),
-        const SizedBox(height: 20),
-        _SelectableStatCard(
-          title: 'Overdue',
-          value: _stats?['overdueCount'].toString() ?? '0',
-          icon: Icons.warning_amber,
-          color: AppColors.error,
-          isAlert: (_stats?['overdueCount'] ?? 0) > 0,
-          isSelected: _selectedStatIndex == 3,
-          onTap: () => setState(() => _selectedStatIndex = 3),
-        ),
-      ],
-    );
-
-    // ── 3. THE CHART MODULE ──
-    Widget rightSideChart = Container(
-      decoration: BoxDecoration(
-        color: LoginColors.cardBase,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
-            offset: const Offset(8, 8),
-            blurRadius: 20,
-          ),
-          const BoxShadow(
-            color: Colors.white,
-            offset: Offset(-8, -8),
-            blurRadius: 20,
-          ),
-        ],
       ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _getChartTitle(),
-            style: GoogleFonts.inter(
-              color: LoginColors.textDark.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w600,
+      data: (stats) {
+        final isMobile = MediaQuery.of(context).size.width < 850;
+        Widget leftSideCards = Column(
+          children: [
+            _SelectableStatCard(
+              title: 'Total Users',
+              value: stats['totalUsers'].toString(),
+              icon: Icons.group,
+              color: AdminColors.purple,
+              isSelected: _selectedStatIndex == 0,
+              onTap: () => setState(() => _selectedStatIndex = 0),
             ),
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: LineChart(
-              LineChartData(
-                clipData: const FlClipData.all(),
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (touchedSpot) => LoginColors.cardBase,
-                    getTooltipItems: (touchedSpots) {
-                      return touchedSpots.map((spot) {
-                        final date = DateTime.now().subtract(
-                          Duration(days: 59 - spot.x.toInt()),
-                        );
-                        return LineTooltipItem(
-                          '${date.day}/${date.month}/${date.year}\n',
-                          GoogleFonts.inter(
-                            color: LoginColors.textDark,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: 'Count: ${spot.y.toInt()}',
-                              style: GoogleFonts.inter(
-                                color: _getChartColor(),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        );
-                      }).toList();
-                    },
-                  ),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: LoginColors.textDark.withValues(alpha: 0.05),
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      interval: 10,
-                      getTitlesWidget: (value, meta) {
-                        final date = DateTime.now().subtract(
-                          Duration(days: 59 - value.toInt()),
-                        );
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 12.0),
-                          child: Text(
-                            '${date.day}/${date.month}',
-                            style: GoogleFonts.inter(
-                              color: LoginColors.textDark.withValues(
-                                alpha: 0.5,
-                              ),
-                              fontSize: 10,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 45,
-                      interval: _getSmartInterval(_selectedStatIndex),
-                      getTitlesWidget: (value, meta) {
-                        if (value == meta.max || value == meta.min) {
-                          return const SizedBox.shrink();
-                        }
-                        return Text(
-                          value.toInt().toString(),
-                          style: GoogleFonts.inter(
-                            color: LoginColors.textDark.withValues(alpha: 0.5),
-                            fontSize: 10,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: _getRealChartData(_selectedStatIndex),
-                    isCurved: true,
-                    preventCurveOverShooting: true,
-                    color: _getChartColor(),
-                    barWidth: 4,
-                    isStrokeCapRound: true,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: _getChartColor().withValues(alpha: 0.15),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 20),
+            _SelectableStatCard(
+              title: 'Total Books',
+              value: stats['totalBooks'].toString(),
+              icon: Icons.library_books,
+              color: AdminColors.purple,
+              isSelected: _selectedStatIndex == 1,
+              onTap: () => setState(() => _selectedStatIndex = 1),
+            ),
+            const SizedBox(height: 20),
+            _SelectableStatCard(
+              title: 'Issued',
+              value: stats['currentlyIssued'].toString(),
+              icon: Icons.bookmark,
+              color: AdminColors.purple,
+              isSelected: _selectedStatIndex == 2,
+              onTap: () => setState(() => _selectedStatIndex = 2),
+            ),
+            const SizedBox(height: 20),
+            _SelectableStatCard(
+              title: 'Overdue',
+              value: stats['overdueCount'].toString(),
+              icon: Icons.warning_amber,
+              color: AppColors.error,
+              isAlert: (stats['overdueCount'] ?? 0) > 0,
+              isSelected: _selectedStatIndex == 3,
+              onTap: () => setState(() => _selectedStatIndex = 3),
+            ),
+          ],
+        );
+
+        Widget rightSideChart = Container(
+          decoration: BoxDecoration(
+            color: LoginColors.cardBase,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                offset: const Offset(8, 8),
+                blurRadius: 20,
               ),
-            ),
+              const BoxShadow(
+                color: Colors.white,
+                offset: Offset(-8, -8),
+                blurRadius: 20,
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-
-    // ── 4. THE RESPONSIVE MAGIC ──
-    if (isMobile) {
-      // MOBILE VIEW: Wrap the ENTIRE page in a scroll view!
-      return SingleChildScrollView(
-        clipBehavior: Clip.none,
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _getChartTitle(),
+                style: GoogleFonts.inter(
+                  color: LoginColors.textDark.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: LineChart(
+                  LineChartData(
+                    clipData: const FlClipData.all(),
+                    lineTouchData: LineTouchData(
+                      touchTooltipData: LineTouchTooltipData(
+                        getTooltipColor: (touchedSpot) => LoginColors.cardBase,
+                        getTooltipItems: (touchedSpots) {
+                          return touchedSpots.map((spot) {
+                            final date = DateTime.now().subtract(
+                              Duration(days: 59 - spot.x.toInt()),
+                            );
+                            return LineTooltipItem(
+                              '${date.day}/${date.month}/${date.year}\n',
+                              GoogleFonts.inter(
+                                color: LoginColors.textDark,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Count: ${spot.y.toInt()}',
+                                  style: GoogleFonts.inter(
+                                    color: _getChartColor(),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList();
+                        },
+                      ),
+                    ),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: LoginColors.textDark.withValues(alpha: 0.05),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    titlesData: FlTitlesData(
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 40,
+                          interval: 10,
+                          getTitlesWidget: (value, meta) {
+                            final date = DateTime.now().subtract(
+                              Duration(days: 59 - value.toInt()),
+                            );
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 12.0),
+                              child: Text(
+                                '${date.day}/${date.month}',
+                                style: GoogleFonts.inter(
+                                  color: LoginColors.textDark.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  fontSize: 10,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 45,
+                          interval: _getSmartInterval(_selectedStatIndex),
+                          getTitlesWidget: (value, meta) {
+                            if (value == meta.max || value == meta.min) {
+                              return const SizedBox.shrink();
+                            }
+                            return Text(
+                              value.toInt().toString(),
+                              style: GoogleFonts.inter(
+                                color: LoginColors.textDark.withValues(
+                                  alpha: 0.5,
+                                ),
+                                fontSize: 10,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: _getRealChartData(_selectedStatIndex, stats),
+                        isCurved: true,
+                        preventCurveOverShooting: true,
+                        color: _getChartColor(),
+                        barWidth: 4,
+                        isStrokeCapRound: true,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: _getChartColor().withValues(alpha: 0.15),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (isMobile) {
+          return SingleChildScrollView(
+            clipBehavior: Clip.none,
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 4.0),
+                  child: Text(
+                    'System Overview',
+                    style: GoogleFonts.dmSerifDisplay(
+                      fontSize: 22,
+                      color: LoginColors.textDark,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                leftSideCards, // The 4 stat buttons
+                const SizedBox(height: 32),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 400, // The chart needs a fixed height on mobile
+                  child: rightSideChart,
+                ),
+              ],
+            ),
+          );
+        }
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
@@ -679,45 +686,35 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               ),
             ),
             const SizedBox(height: 16),
-            leftSideCards, // The 4 stat buttons
-            const SizedBox(height: 32),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              height: 400, // The chart needs a fixed height on mobile
-              child: rightSideChart,
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 2, child: leftSideCards),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 5, child: rightSideChart),
+                ],
+              ),
             ),
           ],
-        ),
-      );
-    }
-
-    // DESKTOP VIEW: Side-by-side layout (No master scrolling needed)
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4.0),
-          child: Text(
-            'System Overview',
-            style: GoogleFonts.dmSerifDisplay(
-              fontSize: 22,
-              color: LoginColors.textDark,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(flex: 2, child: leftSideCards),
-              const SizedBox(width: 24),
-              Expanded(flex: 5, child: rightSideChart),
-            ],
-          ),
-        ),
-      ],
+        );
+      },
     );
+  }
+
+  double _getSmartInterval(int index) {
+    switch (index) {
+      case 0:
+        return 200;
+      case 1:
+        return 1000;
+      case 2:
+        return 50;
+      case 3:
+        return 5;
+      default:
+        return 10;
+    }
   }
 
   String _getChartTitle() {
@@ -863,11 +860,9 @@ class BooksView extends ConsumerStatefulWidget {
 }
 
 class _BooksViewState extends ConsumerState<BooksView> {
-  // ── STATE VARIABLES ──
+  bool _isSubmitting = false;
 
   int _selectedMenuIndex = 0;
-  bool _isSubmitting = false;
-  bool _isLoadingBooks = true;
 
   // ── CONTROLLERS (The Digital Pens) ──
   final TextEditingController _titleController = TextEditingController();
@@ -878,28 +873,21 @@ class _BooksViewState extends ConsumerState<BooksView> {
     text: "1",
   );
 
-  // ── PAGINATION & SEARCH VARIABLES ──
-  int _currentBookPage = 0;
-  bool _isFetchingMore = false;
-  bool _hasMoreBooks = true;
   Timer? _debounce;
 
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
-  List<dynamic> _allBooks = [];
-  List<dynamic> _filteredBooks = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchBooks();
 
     _searchController.addListener(_onSearchChanged);
 
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 50) {
-        _fetchMoreBooks();
+        ref.read(booksProvider.notifier).fetchMore();
       }
     });
   }
@@ -920,72 +908,10 @@ class _BooksViewState extends ConsumerState<BooksView> {
   void _onSearchChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      _fetchBooks();
+      ref.read(booksProvider.notifier).search(_searchController.text.trim());
     });
   }
 
-  // ── API CALL: FETCH BOOKS (PAGINATED) ──
-  Future<void> _fetchBooks() async {
-    setState(() {
-      _isLoadingBooks = true;
-      _currentBookPage = 0;
-      _hasMoreBooks = true;
-      _allBooks.clear();
-      _filteredBooks.clear();
-    });
-
-    try {
-      final data = await ref.read(apiProvider).getAllBooks(
-        page: 0,
-        size: 5,
-        search: _searchController.text.trim(),
-      );
-
-      if (mounted) {
-        setState(() {
-          _allBooks = data ?? [];
-          _filteredBooks = List.from(_allBooks);
-          _hasMoreBooks = (data?.length ?? 0) == 5;
-          _isLoadingBooks = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoadingBooks = false);
-    }
-  }
-
-  Future<void> _fetchMoreBooks() async {
-    if (_isFetchingMore || !_hasMoreBooks || _isLoadingBooks) return;
-
-    setState(() => _isFetchingMore = true);
-
-    try {
-      _currentBookPage++;
-      // Changed _api to _apiService
-      final data = await ref.read(apiProvider).getAllBooks(
-        page: _currentBookPage,
-        size: 5,
-        search: _searchController.text.trim(),
-      );
-
-      if (mounted) {
-        setState(() {
-          if (data != null && data.isNotEmpty) {
-            _allBooks.addAll(data);
-            _filteredBooks = List.from(_allBooks);
-            _hasMoreBooks = data.length == 5;
-          } else {
-            _hasMoreBooks = false;
-          }
-          _isFetchingMore = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isFetchingMore = false);
-    }
-  }
-
-  // ── API CALL: SAVE BOOK ──
   Future<void> _submitBook() async {
     if (_titleController.text.trim().isEmpty ||
         _authorController.text.trim().isEmpty ||
@@ -997,13 +923,15 @@ class _BooksViewState extends ConsumerState<BooksView> {
 
     setState(() => _isSubmitting = true);
 
-    bool success = await ref.read(apiProvider).addNewBook(
-      title: _titleController.text.trim(),
-      author: _authorController.text.trim(),
-      isbn: _isbnController.text.trim(),
-      category: _categoryController.text.trim(),
-      copies: int.tryParse(_copiesController.text) ?? 1,
-    );
+    bool success = await ref
+        .read(apiProvider)
+        .addNewBook(
+          title: _titleController.text.trim(),
+          author: _authorController.text.trim(),
+          isbn: _isbnController.text.trim(),
+          category: _categoryController.text.trim(),
+          copies: int.tryParse(_copiesController.text) ?? 1,
+        );
 
     if (mounted) {
       setState(() => _isSubmitting = false);
@@ -1017,7 +945,7 @@ class _BooksViewState extends ConsumerState<BooksView> {
 
         TopToast.show(context, 'Book Added Successfully!');
 
-        _fetchBooks();
+        ref.invalidate(booksProvider);
       } else {
         TopToast.show(
           context,
@@ -1057,15 +985,13 @@ class _BooksViewState extends ConsumerState<BooksView> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              setState(() => _isLoadingBooks = true);
 
               bool success = await ref.read(apiProvider).deleteBook(book['id']);
 
               if (success && mounted) {
-                await _fetchBooks();
+                ref.invalidate(booksProvider);
                 TopToast.show(context, 'Book deleted successfully.');
               } else if (mounted) {
-                setState(() => _isLoadingBooks = false);
                 TopToast.show(context, 'Failed to delete book.', isError: true);
               }
             },
@@ -1174,24 +1100,26 @@ class _BooksViewState extends ConsumerState<BooksView> {
                               ? null
                               : () async {
                                   setDialogState(() => isSaving = true);
-                                  bool success = await ref.read(apiProvider).updateBook(
-                                    id: book['id'],
-                                    title: editTitleController.text,
-                                    author: editAuthorController.text,
-                                    isbn: editIsbnController.text,
-                                    category: editCategoryController.text,
-                                    totalCopies:
-                                        int.tryParse(
-                                          editCopiesController.text,
-                                        ) ??
-                                        1,
-                                  );
+                                  bool success = await ref
+                                      .read(apiProvider)
+                                      .updateBook(
+                                        id: book['id'],
+                                        title: editTitleController.text,
+                                        author: editAuthorController.text,
+                                        isbn: editIsbnController.text,
+                                        category: editCategoryController.text,
+                                        totalCopies:
+                                            int.tryParse(
+                                              editCopiesController.text,
+                                            ) ??
+                                            1,
+                                      );
 
                                   setDialogState(() => isSaving = false);
 
                                   if (success && mounted) {
                                     Navigator.pop(dialogCtx);
-                                    _fetchBooks();
+                                    ref.invalidate(booksProvider);
                                     TopToast.show(
                                       context,
                                       'Book updated successfully!',
@@ -1243,7 +1171,6 @@ class _BooksViewState extends ConsumerState<BooksView> {
     );
   }
 
-  // ── UI HELPER: TEXT FIELD ──
   Widget _buildTextField(
     String hint,
     IconData icon,
@@ -1288,7 +1215,6 @@ class _BooksViewState extends ConsumerState<BooksView> {
     );
   }
 
-  // ── UI: OPTION 1 (ADD NEW BOOK) ──
   Widget _buildAddBookUi({required bool isMobile}) {
     Widget formContent = SingleChildScrollView(
       physics: isMobile
@@ -1377,17 +1303,25 @@ class _BooksViewState extends ConsumerState<BooksView> {
     );
   }
 
-  // ── UI: OPTION 1 (MANAGE BOOKS) ──
   Widget _buildManageBooksUi({
     required bool isMobile,
     required bool isDeleteMode,
   }) {
-    Widget listContent = _isLoadingBooks
-        ? const Center(
-            child: CircularProgressIndicator(color: LoginColors.accent),
-          )
-        : _filteredBooks.isEmpty
-        ? Center(
+    final booksAsync = ref.watch(booksProvider);
+
+    Widget listContent = booksAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: LoginColors.accent),
+      ),
+      error: (err, stack) => Center(
+        child: Text(
+          'Failed to load books.',
+          style: GoogleFonts.inter(color: AppColors.error),
+        ),
+      ),
+      data: (books) {
+        if (books.isEmpty) {
+          return Center(
             child: Padding(
               padding: const EdgeInsets.all(32.0),
               child: Text(
@@ -1397,183 +1331,184 @@ class _BooksViewState extends ConsumerState<BooksView> {
                 ),
               ),
             ),
-          )
-        : ListView.builder(
-            controller: isMobile ? null : _scrollController,
-            physics: isMobile
-                ? const NeverScrollableScrollPhysics()
-                : const BouncingScrollPhysics(),
-            shrinkWrap: isMobile,
-            padding: const EdgeInsets.only(
-              bottom: 20,
-              top: 4,
-              left: 16,
-              right: 16,
-            ),
-            itemCount: _filteredBooks.length + (_isFetchingMore ? 1 : 0),
-            itemBuilder: (context, index) {
-              // Draw the loading spinner at the very bottom
-              if (index == _filteredBooks.length) {
-                return const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: CircularProgressIndicator(color: LoginColors.accent),
-                  ),
-                );
-              }
+          );
+        }
 
-              final book = _filteredBooks[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: LoginColors.cardBase,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
-                      offset: const Offset(4, 4),
-                      blurRadius: 10,
-                    ),
-                    const BoxShadow(
-                      color: Colors.white,
-                      offset: Offset(-4, -4),
-                      blurRadius: 10,
-                    ),
-                  ],
-                  border: Border.all(color: Colors.white, width: 1),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AdminColors.purple.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.book_rounded,
-                        color: AdminColors.purple,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isDeleteMode
-                                ? 'Delete Books (Danger Zone)'
-                                : 'Library Database',
-                            style: GoogleFonts.dmSerifDisplay(
-                              fontSize: 14,
-                              color: isDeleteMode
-                                  ? AppColors.error
-                                  : LoginColors.accent,
-                            ),
-                          ),
-                          Text(
-                            book['title'] ?? 'Unknown Title',
-                            style: GoogleFonts.inter(
-                              color: LoginColors.textDark,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Author: ${book['author'] ?? 'Unknown'}',
-                            style: GoogleFonts.inter(
-                              color: LoginColors.textDark.withValues(
-                                alpha: 0.6,
-                              ),
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: LoginColors.accent.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  book['category'] ?? 'General',
-                                  style: GoogleFonts.inter(
-                                    color: LoginColors.accent,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Copies: ${book['available_copies'] ?? book['copies'] ?? 1} / ${book['total_copies'] ?? book['copies'] ?? 1}',
-                                  style: GoogleFonts.inter(
-                                    color: LoginColors.textDark.withValues(
-                                      alpha: 0.7,
-                                    ),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: isDeleteMode
-                            ? AppColors.error.withValues(alpha: 0.1)
-                            : LoginColors.accent.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          isDeleteMode
-                              ? Icons.delete_forever_rounded
-                              : Icons.edit_rounded,
-                          color: isDeleteMode
-                              ? AppColors.error
-                              : LoginColors.accent,
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          if (isDeleteMode) {
-                            _showDeleteBookDialog(book);
-                          } else {
-                            _showEditBookDialog(book);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
+        return ListView.builder(
+          controller: isMobile ? null : _scrollController,
+          physics: isMobile
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          shrinkWrap: isMobile,
+          padding: const EdgeInsets.only(
+            bottom: 20,
+            top: 4,
+            left: 16,
+            right: 16,
+          ),
+          itemCount:
+              books.length + (ref.read(booksProvider.notifier).hasMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == books.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(
+                  child: CircularProgressIndicator(color: LoginColors.accent),
                 ),
               );
-            },
-          );
+            }
 
+            final book = books[index];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: LoginColors.cardBase,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                    offset: const Offset(4, 4),
+                    blurRadius: 10,
+                  ),
+                  const BoxShadow(
+                    color: Colors.white,
+                    offset: Offset(-4, -4),
+                    blurRadius: 10,
+                  ),
+                ],
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AdminColors.purple.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.book_rounded,
+                      color: AdminColors.purple,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isDeleteMode
+                              ? 'Delete Books (Danger Zone)'
+                              : 'Library Database',
+                          style: GoogleFonts.dmSerifDisplay(
+                            fontSize: 14,
+                            color: isDeleteMode
+                                ? AppColors.error
+                                : LoginColors.accent,
+                          ),
+                        ),
+                        Text(
+                          book['title'] ?? 'Unknown Title',
+                          style: GoogleFonts.inter(
+                            color: LoginColors.textDark,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Author: ${book['author'] ?? 'Unknown'}',
+                          style: GoogleFonts.inter(
+                            color: LoginColors.textDark.withValues(alpha: 0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: LoginColors.accent.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                book['category'] ?? 'General',
+                                style: GoogleFonts.inter(
+                                  color: LoginColors.accent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Copies: ${book['available_copies'] ?? book['copies'] ?? 1} / ${book['total_copies'] ?? book['copies'] ?? 1}',
+                                style: GoogleFonts.inter(
+                                  color: LoginColors.textDark.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDeleteMode
+                          ? AppColors.error.withValues(alpha: 0.1)
+                          : LoginColors.accent.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        isDeleteMode
+                            ? Icons.delete_forever_rounded
+                            : Icons.edit_rounded,
+                        color: isDeleteMode
+                            ? AppColors.error
+                            : LoginColors.accent,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        if (isDeleteMode) {
+                          _showDeleteBookDialog(book);
+                        } else {
+                          _showEditBookDialog(book);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
@@ -1597,7 +1532,6 @@ class _BooksViewState extends ConsumerState<BooksView> {
     );
   }
 
-  // ── ROUTER: WHICH SCREEN TO SHOW? ──
   Widget _buildRightContent(bool isMobile) {
     switch (_selectedMenuIndex) {
       case 0:
@@ -1810,9 +1744,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
 
   Timer? _debounce;
 
-  int _currentMemberPage = 0;
-  bool _isFetchingMore = false;
-  bool _hasMoreMembers = true;
   final ScrollController _scrollController = ScrollController();
 
   // OTP Verification State
@@ -1824,7 +1755,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
   );
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
-  // Controllers for Add Member Form
   final TextEditingController _addNameController = TextEditingController();
   final TextEditingController _addEmailController = TextEditingController();
   final TextEditingController _addPasswordController = TextEditingController();
@@ -1832,22 +1762,17 @@ class _MembersViewState extends ConsumerState<MembersView> {
   bool _isSubmitting = false;
 
   int _selectedMenuIndex = 0;
-  bool _isLoadingMembers = true;
-
-  List<dynamic> _allMembers = [];
-  List<dynamic> _filteredMembers = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchMembers();
     _searchController.addListener(_onSearchChanged);
 
     _scrollController.addListener(() {
       if ((_selectedMenuIndex == 0 || _selectedMenuIndex == 2) &&
           _scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 50) {
-        _fetchMoreMembers();
+        ref.read(membersProvider.notifier).fetchMore();
       }
     });
   }
@@ -1863,65 +1788,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
     for (var c in _otpControllers) c.dispose();
     for (var f in _otpFocusNodes) f.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchMembers() async {
-    setState(() {
-      _isLoadingMembers = true;
-      _currentMemberPage = 0;
-      _hasMoreMembers = true;
-      _allMembers.clear();
-      _filteredMembers.clear();
-    });
-
-    try {
-      final data = await ref.read(apiProvider).getAllMembers(
-        page: 0,
-        size: 5,
-        search: _searchController.text.trim(),
-      );
-
-      if (mounted) {
-        setState(() {
-          _allMembers = data ?? [];
-          _filteredMembers = List.from(_allMembers);
-          _hasMoreMembers = (data?.length ?? 0) == 5;
-          _isLoadingMembers = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoadingMembers = false);
-    }
-  }
-
-  Future<void> _fetchMoreMembers() async {
-    if (_isFetchingMore || !_hasMoreMembers || _isLoadingMembers) return;
-
-    setState(() => _isFetchingMore = true);
-
-    try {
-      _currentMemberPage++;
-      final data = await ref.read(apiProvider).getAllMembers(
-        page: _currentMemberPage,
-        size: 5,
-        search: _searchController.text.trim(),
-      );
-
-      if (mounted) {
-        setState(() {
-          if (data != null && data.isNotEmpty) {
-            _allMembers.addAll(data);
-            _filteredMembers = List.from(_allMembers);
-            _hasMoreMembers = data.length == 5;
-          } else {
-            _hasMoreMembers = false;
-          }
-          _isFetchingMore = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isFetchingMore = false);
-    }
   }
 
   Future<void> _handleVerifyOtp() async {
@@ -1945,7 +1811,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
     if (success) {
       TopToast.show(context, 'Account Fully Verified and Activated!');
 
-      // Reset everything for the next user
       _addNameController.clear();
       _addEmailController.clear();
       _addPasswordController.clear();
@@ -1956,7 +1821,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
         _addRole = 'MEMBER';
         _isAccountCreated = false;
       });
-      await _fetchMembers(); // Refresh the list
+      ref.invalidate(membersProvider);
     } else {
       for (var c in _otpControllers) {
         c.clear();
@@ -2045,8 +1910,10 @@ class _MembersViewState extends ConsumerState<MembersView> {
                     if (selectedRole == member['role']) return;
 
                     try {
-                      await ref.read(apiProvider).updateUserRole(member['id'], selectedRole);
-                      await _fetchMembers();
+                      await ref
+                          .read(apiProvider)
+                          .updateUserRole(member['id'], selectedRole);
+                      ref.invalidate(membersProvider);
 
                       if (!context.mounted) return;
                       TopToast.show(context, 'Role updated successfully!');
@@ -2085,12 +1952,14 @@ class _MembersViewState extends ConsumerState<MembersView> {
     try {
       final email = _addEmailController.text.trim();
 
-      await ref.read(apiProvider).addMember(
-        _addNameController.text.trim(),
-        email,
-        _addPasswordController.text,
-        _addRole,
-      );
+      await ref
+          .read(apiProvider)
+          .addMember(
+            _addNameController.text.trim(),
+            email,
+            _addPasswordController.text,
+            _addRole,
+          );
 
       await ref.read(apiProvider).sendOtp(email);
 
@@ -2144,7 +2013,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
               Navigator.pop(ctx);
               try {
                 await ref.read(apiProvider).deleteMember(id);
-                await _fetchMembers();
+                ref.invalidate(membersProvider);
 
                 if (!mounted) return;
                 TopToast.show(context, 'Member deleted successfully.');
@@ -2170,7 +2039,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
     );
   }
 
-  // ── UI: NEUMORPHIC MEMBER INFO DIALOG ──
   Future<void> _showMemberInfoDialog(Map<String, dynamic> member) async {
     showDialog(
       context: context,
@@ -2300,7 +2168,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
     );
   }
 
-  // Small helper widget just for the dialog rows
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -2335,13 +2202,10 @@ class _MembersViewState extends ConsumerState<MembersView> {
   }
 
   void _onSearchChanged() {
-    // If the user is still typing, cancel the previous timer
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
-    // Start a new 500ms timer
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      // Once the user stops typing for half a second, fetch Page 0 with the search query!
-      _fetchMembers();
+      ref.read(membersProvider.notifier).search(_searchController.text.trim());
     });
   }
 
@@ -2413,7 +2277,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
     // ── 4. THE RESPONSIVE ASSEMBLY ──
 
     if (isMobile) {
-      // MOBILE VIEW: Wrap EVERYTHING (including the title) in the ScrollView
       return SingleChildScrollView(
         controller: _scrollController,
         clipBehavior: Clip.none,
@@ -2444,7 +2307,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
       );
     }
 
-    // DESKTOP VIEW: Keep the title fixed at the top, and put the content side-by-side
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2487,14 +2349,22 @@ class _MembersViewState extends ConsumerState<MembersView> {
   }
 
   Widget _buildListUi({required bool isDeleteMode, required bool isMobile}) {
-    if (_isLoadingMembers)
-      return const Center(
-        child: CircularProgressIndicator(color: LoginColors.accent),
-      );
+    final membersAsync = ref.watch(membersProvider);
 
-    // ── ISOLATE THE LISTVIEW ──
-    Widget listContent = _filteredMembers.isEmpty
-        ? Center(
+    Widget listContent = membersAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: LoginColors.accent),
+      ),
+      error: (err, stack) => Center(
+        child: Text(
+          'Failed to load members.',
+          style: GoogleFonts.inter(color: AppColors.error),
+        ),
+      ),
+
+      data: (members) {
+        if (members.isEmpty) {
+          return Center(
             child: Padding(
               padding: const EdgeInsets.all(32.0),
               child: Text(
@@ -2504,223 +2374,223 @@ class _MembersViewState extends ConsumerState<MembersView> {
                 ),
               ),
             ),
-          )
-        : ListView.builder(
-            controller: isMobile ? null : _scrollController,
-            physics: isMobile
-                ? const NeverScrollableScrollPhysics()
-                : const BouncingScrollPhysics(),
-            shrinkWrap: isMobile,
-            padding: const EdgeInsets.only(
-              bottom: 20,
-              top: 4,
-              left: 15,
-              right: 15,
-            ),
-            itemCount: _filteredMembers.length + (_isFetchingMore ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index == _filteredMembers.length) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: CircularProgressIndicator(color: LoginColors.accent),
-                  ),
-                );
-              }
-              final member = _filteredMembers[index];
-              final isAdmin = member['role'] == 'ADMIN';
-              final isSelf = member['email'] == widget.adminEmail;
+          );
+        }
+        return ListView.builder(
+          controller: isMobile ? null : _scrollController,
+          physics: isMobile
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          shrinkWrap: isMobile,
+          padding: const EdgeInsets.only(
+            bottom: 20,
+            top: 4,
+            left: 15,
+            right: 15,
+          ),
+          itemCount:
+              members.length +
+              (ref.read(membersProvider.notifier).hasMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == members.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: CircularProgressIndicator(color: LoginColors.accent),
+                ),
+              );
+            }
+            final member = members[index];
+            final isAdmin = member['role'] == 'ADMIN';
+            final isSelf = member['email'] == widget.adminEmail;
 
-              return MouseRegion(
-                cursor: isDeleteMode
-                    ? SystemMouseCursors.basic
-                    : SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: isDeleteMode
-                      ? null
-                      : () => _showMemberInfoDialog(member),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: LoginColors.cardBase,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
-                          offset: const Offset(4, 4),
-                          blurRadius: 10,
-                        ),
-                        const BoxShadow(
-                          color: Colors.white,
-                          offset: Offset(-4, -4),
-                          blurRadius: 10,
-                        ),
-                      ],
-                      border: isDeleteMode && !isSelf
-                          ? Border.all(
-                              color: AppColors.error.withValues(alpha: 0.5),
-                              width: 1.5,
-                            )
-                          : Border.all(color: Colors.white, width: 1),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: isAdmin
-                              ? LoginColors.accent.withValues(alpha: 0.15)
-                              : Colors.black.withValues(alpha: 0.05),
-                          child: Text(
-                            (member['name'] ?? 'U')[0].toUpperCase(),
-                            style: GoogleFonts.dmSerifDisplay(
-                              color: isAdmin
-                                  ? LoginColors.accent
-                                  : LoginColors.textDark.withValues(alpha: 0.7),
-                              fontSize: 20,
-                            ),
+            return MouseRegion(
+              cursor: isDeleteMode
+                  ? SystemMouseCursors.basic
+                  : SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: isDeleteMode
+                    ? null
+                    : () => _showMemberInfoDialog(member),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: LoginColors.cardBase,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                        offset: const Offset(4, 4),
+                        blurRadius: 10,
+                      ),
+                      const BoxShadow(
+                        color: Colors.white,
+                        offset: Offset(-4, -4),
+                        blurRadius: 10,
+                      ),
+                    ],
+                    border: isDeleteMode && !isSelf
+                        ? Border.all(
+                            color: AppColors.error.withValues(alpha: 0.5),
+                            width: 1.5,
+                          )
+                        : Border.all(color: Colors.white, width: 1),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: isAdmin
+                            ? LoginColors.accent.withValues(alpha: 0.15)
+                            : Colors.black.withValues(alpha: 0.05),
+                        child: Text(
+                          (member['name'] ?? 'U')[0].toUpperCase(),
+                          style: GoogleFonts.dmSerifDisplay(
+                            color: isAdmin
+                                ? LoginColors.accent
+                                : LoginColors.textDark.withValues(alpha: 0.7),
+                            fontSize: 20,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 1. Wrap automatically drops the badge to the next line if space runs out!
-                              Wrap(
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 8, // Space between name and badge
-                                runSpacing: 6, // Vertical space if it wraps
-                                children: [
-                                  Text(
-                                    member['name'] ?? 'Unknown Account',
-                                    style: GoogleFonts.inter(
-                                      color: LoginColors.textDark,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. Wrap automatically drops the badge to the next line if space runs out!
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8, // Space between name and badge
+                              runSpacing: 6, // Vertical space if it wraps
+                              children: [
+                                Text(
+                                  member['name'] ?? 'Unknown Account',
+                                  style: GoogleFonts.inter(
+                                    color: LoginColors.textDark,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
                                   ),
+                                ),
 
-                                  if (!isDeleteMode)
-                                    GestureDetector(
-                                      onTap: () => _changeRoleDialog(member),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isAdmin
-                                              ? LoginColors.accent.withValues(
-                                                  alpha: 0.12,
-                                                )
-                                              : Colors.black.withValues(
-                                                  alpha: 0.05,
-                                                ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              member['role'] ?? 'MEMBER',
-                                              style: GoogleFonts.inter(
-                                                color: isAdmin
-                                                    ? LoginColors.accent
-                                                    : LoginColors.textDark
-                                                          .withValues(
-                                                            alpha: 0.7,
-                                                          ),
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
+                                if (!isDeleteMode)
+                                  GestureDetector(
+                                    onTap: () => _changeRoleDialog(member),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isAdmin
+                                            ? LoginColors.accent.withValues(
+                                                alpha: 0.12,
+                                              )
+                                            : Colors.black.withValues(
+                                                alpha: 0.05,
                                               ),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Icon(
-                                              Icons.edit_rounded,
-                                              size: 12,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            member['role'] ?? 'MEMBER',
+                                            style: GoogleFonts.inter(
                                               color: isAdmin
                                                   ? LoginColors.accent
                                                   : LoginColors.textDark
-                                                        .withValues(alpha: 0.5),
+                                                        .withValues(alpha: 0.7),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            Icons.edit_rounded,
+                                            size: 12,
+                                            color: isAdmin
+                                                ? LoginColors.accent
+                                                : LoginColors.textDark
+                                                      .withValues(alpha: 0.5),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              // 2. Added ellipsis so emails smoothly truncate instead of stacking vertically
-                              Text(
-                                member['email'] ?? '',
-                                style: GoogleFonts.inter(
-                                  color: LoginColors.textDark.withValues(
-                                    alpha: 0.6,
                                   ),
-                                  fontSize: 13,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-
-                              // 3. Moved the joined date to the main column for maximum horizontal breathing room
-                              if (!isDeleteMode) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Joined: ${member['joined'] ?? 'N/A'}',
-                                  style: GoogleFonts.inter(
-                                    color: LoginColors.textDark.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    fontSize: 11,
-                                  ),
-                                ),
                               ],
-                            ],
-                          ),
-                        ),
-                        // Delete mode right-side icon
-                        if (isDeleteMode) ...[
-                          const SizedBox(width: 12),
-                          if (isSelf)
+                            ),
+                            const SizedBox(height: 4),
+                            // 2. Added ellipsis so emails smoothly truncate instead of stacking vertically
                             Text(
-                              'Current User',
+                              member['email'] ?? '',
                               style: GoogleFonts.inter(
                                 color: LoginColors.textDark.withValues(
-                                  alpha: 0.4,
+                                  alpha: 0.6,
                                 ),
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
+                                fontSize: 13,
                               ),
-                            )
-                          else
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.error.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: Icon(
-                                  Icons.delete_forever_rounded,
-                                  color: AppColors.error.withValues(alpha: 0.9),
-                                  size: 20,
-                                ),
-                                onPressed: () =>
-                                    _deleteMember(member['id'], member['name']),
-                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                        ],
+
+                            // 3. Moved the joined date to the main column for maximum horizontal breathing room
+                            if (!isDeleteMode) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Joined: ${member['joined'] ?? 'N/A'}',
+                                style: GoogleFonts.inter(
+                                  color: LoginColors.textDark.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      // Delete mode right-side icon
+                      if (isDeleteMode) ...[
+                        const SizedBox(width: 12),
+                        if (isSelf)
+                          Text(
+                            'Current User',
+                            style: GoogleFonts.inter(
+                              color: LoginColors.textDark.withValues(
+                                alpha: 0.4,
+                              ),
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          )
+                        else
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: Icon(
+                                Icons.delete_forever_rounded,
+                                color: AppColors.error.withValues(alpha: 0.9),
+                                size: 20,
+                              ),
+                              onPressed: () =>
+                                  _deleteMember(member['id'], member['name']),
+                            ),
+                          ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-              );
-            },
-          );
-
+              ),
+            );
+          },
+        );
+      },
+    );
     return Column(
       key: ValueKey(isDeleteMode ? 'delete_view' : 'search_view'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3010,9 +2880,9 @@ class _MembersViewState extends ConsumerState<MembersView> {
               child: TextButton.icon(
                 onPressed: () async {
                   try {
-                    await ref.read(apiProvider).deleteUnverifiedUser(
-                      _addEmailController.text.trim(),
-                    );
+                    await ref
+                        .read(apiProvider)
+                        .deleteUnverifiedUser(_addEmailController.text.trim());
                   } catch (_) {}
 
                   setState(() {
@@ -3070,7 +2940,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
     );
   }
 
-  // Updated helper to accept an 'enabled' parameter
   Widget _buildTextField(
     String hint,
     IconData icon,
@@ -3238,21 +3107,14 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
 
   Timer? _debounce;
 
-  bool _isLoadingHistory = true;
-  List<dynamic> _borrowHistory = [];
-
   @override
   void initState() {
     super.initState();
-    _fetchGlobalHistory();
-    _fetchDailyActivity();
-    _dailySearchController.addListener(_filterDailyLogs);
-
     _scrollController.addListener(() {
       if (_selectedMenuIndex == 1) {
         if (_scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 50) {
-          _fetchMoreHistory();
+          ref.read(borrowHistoryProvider.notifier).fetchMore();
         }
       }
     });
@@ -3262,18 +3124,8 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
   String _filterSort = 'LATEST';
   DateTime _filterDate = DateTime.now();
 
-  // ── PAGINATION VARIABLES ──
-  int _currentHistoryPage = 0;
-  bool _isFetchingMore = false;
-  bool _hasMoreHistory = true;
   final ScrollController _scrollController = ScrollController();
 
-  // ── NEW: DAILY ACTIVITY VARIABLES ──
-  bool _isLoadingDaily = true;
-  int _todayIssuesCount = 0;
-  int _todayReturnsCount = 0;
-  List<dynamic> _allDailyLogs = [];
-  List<dynamic> _filteredDailyLogs = [];
   final TextEditingController _dailySearchController = TextEditingController();
 
   @override
@@ -3284,117 +3136,6 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     super.dispose();
   }
 
-  Future<void> _fetchDailyActivity({DateTime? date}) async {
-    setState(() => _isLoadingDaily = true);
-
-    try {
-
-      String? dateString;
-      if (date != null) {
-        dateString =
-            "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-      }
-
-      final data = await ref.read(apiProvider).getDailyActivityLogs(date: dateString);
-
-      if (data != null && mounted) {
-        setState(() {
-          _todayIssuesCount = data['todayIssues'] ?? 0;
-          _todayReturnsCount = data['todayReturns'] ?? 0;
-
-          final List<dynamic> realLogs = data['logs'] ?? [];
-          _allDailyLogs = realLogs;
-
-          _filterDailyLogs();
-          _isLoadingDaily = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingDaily = false);
-        debugPrint('Error loading daily activity: $e');
-      }
-    }
-  }
-
-  void _filterDailyLogs() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      final query = _dailySearchController.text.toLowerCase();
-
-      setState(() {
-        _filteredDailyLogs = _allDailyLogs.where((log) {
-          final book = (log['book_title'] ?? '').toString().toLowerCase();
-          final member = (log['member_name'] ?? '').toString().toLowerCase();
-          final action = (log['action'] ?? '').toString();
-
-          final matchesSearch = book.contains(query) || member.contains(query);
-          final matchesAction =
-              _filterAction == 'ALL' || action == _filterAction;
-
-          return matchesSearch && matchesAction;
-        }).toList();
-
-        if (_filterSort == 'OLDEST') {
-          _filteredDailyLogs = _filteredDailyLogs.reversed.toList();
-        }
-      });
-    });
-  }
-
-  Future<void> _fetchGlobalHistory() async {
-    setState(() {
-      _isLoadingHistory = true;
-      _currentHistoryPage = 0;
-      _hasMoreHistory = true;
-      _borrowHistory.clear();
-    });
-
-    try {
-      final data = await ref.read(apiProvider).getGlobalBorrowHistory(page: 0, size: 5);
-
-      if (mounted) {
-        setState(() {
-          _borrowHistory = data ?? [];
-          _hasMoreHistory = (data?.length ?? 0) == 5;
-          _isLoadingHistory = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoadingHistory = false);
-    }
-  }
-
-  Future<void> _fetchMoreHistory() async {
-    if (_isFetchingMore || !_hasMoreHistory || _isLoadingHistory) return;
-
-    setState(() => _isFetchingMore = true);
-
-    try {
-      _currentHistoryPage++;
-      final newData = await ref.read(apiProvider).getGlobalBorrowHistory(
-        page: _currentHistoryPage,
-        size: 5,
-      );
-
-      if (mounted) {
-        setState(() {
-          if (newData != null && newData.isNotEmpty) {
-            _borrowHistory.addAll(newData);
-            _hasMoreHistory = newData.length == 5;
-          } else {
-            _hasMoreHistory = false;
-          }
-          _isFetchingMore = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isFetchingMore = false);
-    }
-  }
-
-  // ── UI: NEUMORPHIC FILTER DIALOG ──
   Future<void> _showFilterDialog() async {
     String tempAction = _filterAction;
     String tempSort = _filterSort;
@@ -3583,7 +3324,6 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                             _filterSort = tempSort;
                             _filterDate = tempDate;
                           });
-                          _fetchDailyActivity(date: _filterDate);
                           Navigator.pop(ctx);
                         },
                         style: ElevatedButton.styleFrom(
@@ -3614,7 +3354,6 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     );
   }
 
-  // ── UI: NEUMORPHIC LOG DETAILS DIALOG ──
   Future<void> _showLogDetailsDialog(Map<String, dynamic> log) async {
     final bool isIssue = log['action'] == 'ISSUED';
     final Color actionColor = isIssue
@@ -3794,7 +3533,6 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     );
   }
 
-  // Small helper widget for the dialog rows
   Widget _buildInfoRow(
     IconData icon,
     String label,
@@ -3834,228 +3572,259 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     );
   }
 
-  // ── UI: DAILY ACTIVITY LOGS (From Wireframe) ──
   Widget _buildDailyActivityUi({required bool isMobile}) {
-    if (_isLoadingDaily)
-      return const Center(
+    String? dateString = "${_filterDate.year}-${_filterDate.month
+        .toString()
+        .padLeft(2, '0')}-${_filterDate.day.toString().padLeft(2, '0')}";
+
+    final dailyAsync = ref.watch(dailyActivityProvider(dateString));
+
+    return dailyAsync.when(
+      loading: () =>
+      const Center(
         child: CircularProgressIndicator(color: LoginColors.accent),
-      );
-
-    // 1. The Summary Cards (Top Row)
-    Widget summaryCards = Row(
-      children: [
-        Expanded(
-          child: _buildSummaryCard(
-            'Today\'s Issues',
-            _todayIssuesCount.toString(),
-            LoginColors.accent,
-            Icons.outbox_rounded,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildSummaryCard(
-            'Today\'s Returns',
-            _todayReturnsCount.toString(),
-            const Color(0xFF00B894),
-            Icons.move_to_inbox_rounded,
-          ),
-        ),
-      ],
-    );
-
-    // 2. The Search Bar
-    Widget searchBar = Container(
-      decoration: BoxDecoration(
-        color: LoginColors.cardBase,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.05),
-          width: 1.5,
-        ),
       ),
-      child: TextField(
-        controller: _dailySearchController,
-        style: GoogleFonts.inter(
-          color: LoginColors.textDark,
-          fontWeight: FontWeight.w500,
-        ),
-        decoration: InputDecoration(
-          hintText: 'Search logs by book or member...',
-          hintStyle: GoogleFonts.inter(
-            color: LoginColors.textDark.withValues(alpha: 0.4),
+      error: (err, stack) =>
+          Center(
+            child: Text('Failed to load daily activity.',
+                style: GoogleFonts.inter(color: AppColors.error)),
           ),
-          prefixIcon: const Icon(Icons.search, color: LoginColors.accent),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.tune_rounded, color: LoginColors.accent),
-            onPressed: _showFilterDialog,
-          ), // Filter Icon from wireframe
-          filled: true,
-          fillColor: Colors.black.withValues(alpha: 0.02),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
-    );
+      data: (data) {
+        final todayIssuesCount = data['todayIssues'] ?? 0;
+        final todayReturnsCount = data['todayReturns'] ?? 0;
+        final List<dynamic> allLogs = data['logs'] ?? [];
 
-    // 3. The List View
-    Widget listContent = _filteredDailyLogs.isEmpty
-        ? Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Text(
-                'No activity found.',
-                style: GoogleFonts.inter(
-                  color: LoginColors.textDark.withValues(alpha: 0.4),
-                ),
+        final query = _dailySearchController.text.toLowerCase();
+        List<dynamic> filteredLogs = allLogs.where((log) {
+          final book = (log['book_title'] ?? '').toString().toLowerCase();
+          final member = (log['member_name'] ?? '').toString().toLowerCase();
+          final action = (log['action'] ?? '').toString();
+
+          final matchesSearch = book.contains(query) || member.contains(query);
+          final matchesAction = _filterAction == 'ALL' ||
+              action == _filterAction;
+          return matchesSearch && matchesAction;
+        }).toList();
+
+        if (_filterSort == 'OLDEST') {
+          filteredLogs = filteredLogs.reversed.toList();
+        }
+
+        Widget summaryCards = Row(
+          children: [
+            Expanded(
+              child: _buildSummaryCard(
+                'Today\'s Issues',
+                todayIssuesCount.toString(),
+                LoginColors.accent,
+                Icons.outbox_rounded,
               ),
             ),
-          )
-        : ListView.builder(
-            physics: isMobile
-                ? const NeverScrollableScrollPhysics()
-                : const BouncingScrollPhysics(),
-            shrinkWrap: isMobile,
-            padding: const EdgeInsets.only(
-              bottom: 20,
-              top: 8,
-              left: 12,
-              right: 12,
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildSummaryCard(
+                'Today\'s Returns',
+                todayReturnsCount.toString(),
+                const Color(0xFF00B894),
+                Icons.move_to_inbox_rounded,
+              ),
             ),
-            itemCount: _filteredDailyLogs.length,
-            itemBuilder: (context, index) {
-              final log = _filteredDailyLogs[index];
-              final isIssue = log['action'] == 'ISSUED';
-              final actionColor = isIssue
-                  ? LoginColors.accent
-                  : const Color(0xFF00B894);
+          ],
+        );
 
-              return MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: () => _showLogDetailsDialog(log),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 20),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: LoginColors.cardBase,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
-                          offset: const Offset(3, 3),
-                          blurRadius: 8,
+        Widget searchBar = Container(
+          decoration: BoxDecoration(
+            color: LoginColors.cardBase,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.black.withValues(alpha: 0.05),
+              width: 1.5,
+            ),
+          ),
+          child: TextField(
+            controller: _dailySearchController,
+            onChanged: (_) => setState(() {}),
+            style: GoogleFonts.inter(
+              color: LoginColors.textDark,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Search logs by book or member...',
+              hintStyle: GoogleFonts.inter(
+                color: LoginColors.textDark.withValues(alpha: 0.4),
+              ),
+              prefixIcon: const Icon(Icons.search, color: LoginColors.accent),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.tune_rounded, color: LoginColors.accent),
+                onPressed: _showFilterDialog,
+              ),
+              // Filter Icon from wireframe
+              filled: true,
+              fillColor: Colors.black.withValues(alpha: 0.02),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        );
+
+        Widget listContent = filteredLogs.isEmpty
+            ? Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Text(
+              'No activity found.',
+              style: GoogleFonts.inter(
+                color: LoginColors.textDark.withValues(alpha: 0.4),
+              ),
+            ),
+          ),
+        )
+            : ListView.builder(
+          physics: isMobile
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          shrinkWrap: isMobile,
+          padding: const EdgeInsets.only(
+            bottom: 20,
+            top: 8,
+            left: 12,
+            right: 12,
+          ),
+          itemCount: filteredLogs.length,
+          itemBuilder: (context, index) {
+            final log = filteredLogs[index];
+            final isIssue = log['action'] == 'ISSUED';
+            final actionColor = isIssue
+                ? LoginColors.accent
+                : const Color(0xFF00B894);
+
+            return MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => _showLogDetailsDialog(log),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: LoginColors.cardBase,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                        offset: const Offset(3, 3),
+                        blurRadius: 8,
+                      ),
+                      const BoxShadow(
+                        color: Colors.white,
+                        offset: Offset(-3, -3),
+                        blurRadius: 8,
+                      ),
+                    ],
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      // Status Indicator Dot
+                      Container(
+                        width: 5,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: actionColor,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        const BoxShadow(
-                          color: Colors.white,
-                          offset: Offset(-3, -3),
-                          blurRadius: 8,
-                        ),
-                      ],
-                      border: Border.all(color: Colors.white, width: 1),
-                    ),
-                    child: Row(
-                      children: [
-                        // Status Indicator Dot
-                        Container(
-                          width: 5,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: actionColor,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                log['book_title'] ?? '',
-                                style: GoogleFonts.inter(
-                                  color: LoginColors.textDark,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                log['member_name'] ?? '',
-                                style: GoogleFonts.inter(
-                                  color: LoginColors.textDark.withValues(
-                                    alpha: 0.6,
-                                  ),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: actionColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                log['action'] ?? '',
-                                style: GoogleFonts.inter(
-                                  color: actionColor,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            Text(
+                              log['book_title'] ?? '',
+                              style: GoogleFonts.inter(
+                                color: LoginColors.textDark,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 4),
                             Text(
-                              log['time'] ?? '',
+                              log['member_name'] ?? '',
                               style: GoogleFonts.inter(
                                 color: LoginColors.textDark.withValues(
-                                  alpha: 0.5,
+                                  alpha: 0.6,
                                 ),
-                                fontSize: 11,
+                                fontSize: 13,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: actionColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              log['action'] ?? '',
+                              style: GoogleFonts.inter(
+                                color: actionColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            log['time'] ?? '',
+                            style: GoogleFonts.inter(
+                              color: LoginColors.textDark.withValues(
+                                alpha: 0.5,
+                              ),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
-          );
+              ),
+            );
+          },
+        );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
-      children: [
-        Text(
-          'Daily Activity Logs',
-          style: GoogleFonts.dmSerifDisplay(
-            color: LoginColors.textDark,
-            fontSize: 20,
-          ),
-        ),
-        const SizedBox(height: 16),
-        summaryCards,
-        const SizedBox(height: 24),
-        searchBar,
-        const SizedBox(height: 16),
-        isMobile ? listContent : Expanded(child: listContent),
-      ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
+          children: [
+            Text(
+              'Daily Activity Logs',
+              style: GoogleFonts.dmSerifDisplay(
+                color: LoginColors.textDark,
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 16),
+            summaryCards,
+            const SizedBox(height: 24),
+            searchBar,
+            const SizedBox(height: 16),
+            isMobile ? listContent : Expanded(child: listContent),
+          ],
+        );
+      },
     );
   }
 
-  // Helper Widget for the Top Cards
   Widget _buildSummaryCard(
     String title,
     String count,
@@ -4115,15 +3884,24 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     );
   }
 
-  // ── UI: THE BORROW HISTORY LOG (Imported from Members) ──
   Widget _buildHistoryUi({required bool isMobile}) {
-    if (_isLoadingHistory)
-      return const Center(
-        child: CircularProgressIndicator(color: LoginColors.accent),
-      );
+    final historyAsync = ref.watch(borrowHistoryProvider);
 
-    Widget listContent = _borrowHistory.isEmpty
-        ? Center(
+    Widget listContent = historyAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: LoginColors.accent),
+      ),
+
+      error: (err, stack) => Center(
+        child: Text(
+          'Failed to load history.',
+          style: GoogleFonts.inter(color: AppColors.error),
+        ),
+      ),
+
+      data: (history) {
+        if (history.isEmpty) {
+          return Center(
             child: Text(
               'No borrow history found.',
               style: GoogleFonts.inter(
@@ -4131,188 +3909,190 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                 fontSize: 13,
               ),
             ),
-          )
-        : ListView.builder(
-            controller: isMobile ? null : _scrollController,
-            physics: isMobile
-                ? const NeverScrollableScrollPhysics()
-                : const BouncingScrollPhysics(),
-            shrinkWrap: isMobile,
-            padding: const EdgeInsets.only(
-              bottom: 20,
-              top: 14,
-              left: 14,
-              right: 14,
-            ),
-            itemCount: _borrowHistory.length + (_isFetchingMore ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index == _borrowHistory.length) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: CircularProgressIndicator(color: LoginColors.accent),
-                  ),
-                );
-              }
-              final record = _borrowHistory[index];
-              final String status = record['status'] ?? 'ACTIVE';
-
-              Color statusColor = LoginColors.accent;
-              if (status == 'OVERDUE') statusColor = AppColors.error;
-              if (status == 'RETURNED')
-                statusColor = LoginColors.textDark.withValues(alpha: 0.4);
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: LoginColors.cardBase,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
-                      offset: const Offset(4, 4),
-                      blurRadius: 10,
-                    ),
-                    const BoxShadow(
-                      color: Colors.white,
-                      offset: Offset(-4, -4),
-                      blurRadius: 10,
-                    ),
-                  ],
-                  border: Border.all(color: Colors.white, width: 1),
+          );
+        }
+        return ListView.builder(
+          controller: isMobile ? null : _scrollController,
+          physics: isMobile
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          shrinkWrap: isMobile,
+          padding: const EdgeInsets.only(
+            bottom: 20,
+            top: 14,
+            left: 14,
+            right: 14,
+          ),
+          itemCount:
+              history.length +
+              (ref.read(borrowHistoryProvider.notifier).hasMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == history.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: CircularProgressIndicator(color: LoginColors.accent),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.menu_book_rounded,
-                        color: statusColor,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            record['title'] ?? 'Title N/A',
-                            style: GoogleFonts.inter(
-                              color: LoginColors.textDark,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          // New field indicating WHO borrowed it
-                          Text(
-                            'Borrowed by: ${record['member_name'] ?? 'Unknown'}',
-                            style: GoogleFonts.inter(
-                              color: LoginColors.textDark.withValues(
-                                alpha: 0.6,
-                              ),
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+              );
+            }
+            final record = history[index];
+            final String status = record['status'] ?? 'ACTIVE';
 
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 4,
-                            children: [
-                              Text(
-                                'Issued: ${record['issued_at']}',
-                                style: GoogleFonts.inter(
-                                  color: LoginColors.textDark.withValues(
-                                    alpha: 0.6,
-                                  ),
-                                  fontSize: 12,
-                                ),
-                              ),
-                              Text(
-                                'Due: ${record['due_date']}',
-                                style: GoogleFonts.inter(
-                                  color: status == 'OVERDUE'
-                                      ? AppColors.error
-                                      : LoginColors.textDark.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                  fontSize: 12,
-                                  fontWeight: status == 'OVERDUE'
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ],
+            Color statusColor = LoginColors.accent;
+            if (status == 'OVERDUE') statusColor = AppColors.error;
+            if (status == 'RETURNED')
+              statusColor = LoginColors.textDark.withValues(alpha: 0.4);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: LoginColors.cardBase,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
+                    offset: const Offset(4, 4),
+                    blurRadius: 10,
+                  ),
+                  const BoxShadow(
+                    color: Colors.white,
+                    offset: Offset(-4, -4),
+                    blurRadius: 10,
+                  ),
+                ],
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.menu_book_rounded,
+                      color: statusColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          record['title'] ?? 'Title N/A',
+                          style: GoogleFonts.inter(
+                            color: LoginColors.textDark,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                           ),
-                          if (status == 'RETURNED' &&
-                              record['returned_at'] != null) ...[
-                            const SizedBox(height: 4),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        // New field indicating WHO borrowed it
+                        Text(
+                          'Borrowed by: ${record['member_name'] ?? 'Unknown'}',
+                          style: GoogleFonts.inter(
+                            color: LoginColors.textDark.withValues(alpha: 0.6),
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
+                          children: [
                             Text(
-                              'Returned On: ${record['returned_at']}',
+                              'Issued: ${record['issued_at']}',
                               style: GoogleFonts.inter(
-                                color: const Color(0xFF00B894),
+                                color: LoginColors.textDark.withValues(
+                                  alpha: 0.6,
+                                ),
                                 fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'Due: ${record['due_date']}',
+                              style: GoogleFonts.inter(
+                                color: status == 'OVERDUE'
+                                    ? AppColors.error
+                                    : LoginColors.textDark.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                fontSize: 12,
+                                fontWeight: status == 'OVERDUE'
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           ],
-
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 12,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: statusColor.withValues(alpha: 0.2),
-                                  ),
-                                ),
-                                child: Text(
-                                  status,
-                                  style: GoogleFonts.inter(
-                                    color: statusColor,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              if ((record['fine_amount'] as num?) != null &&
-                                  (record['fine_amount'] as num) > 0)
-                                Text(
-                                  'Fine: ₹${record['fine_amount']}',
-                                  style: GoogleFonts.inter(
-                                    color: AppColors.error,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                            ],
+                        ),
+                        if (status == 'RETURNED' &&
+                            record['returned_at'] != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Returned On: ${record['returned_at']}',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF00B894),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
 
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 12,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Text(
+                                status,
+                                style: GoogleFonts.inter(
+                                  color: statusColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if ((record['fine_amount'] as num?) != null &&
+                                (record['fine_amount'] as num) > 0)
+                              Text(
+                                'Fine: ₹${record['fine_amount']}',
+                                style: GoogleFonts.inter(
+                                  color: AppColors.error,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
@@ -4338,7 +4118,6 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     );
   }
 
-  // ── ROUTER ──
   Widget _buildRightContent(bool isMobile) {
     switch (_selectedMenuIndex) {
       case 0:
@@ -4357,7 +4136,6 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     // LEFT MENU
     Widget menuButtons = Column(
       children: [
-        // 1. Daily Activity is now Index 0
         _ReportActionCard(
           title: 'Daily Activity Logs',
           subtitle: 'Today\'s Issues & Returns',
