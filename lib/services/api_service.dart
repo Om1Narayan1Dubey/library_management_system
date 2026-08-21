@@ -65,8 +65,11 @@ class ApiService {
     return res.data;
   }
 
-  Future<void> sendOtp(String email) async {
-    await _dio.post('/auth/send-otp', data: {'email': email});
+  Future<void> sendOtp(String email, {String purpose = 'VERIFY'}) async {
+    await _dio.post('/auth/send-otp', data: {
+      'email': email,
+      'purpose': purpose
+    });
   }
 
   Future<Map<String, dynamic>> verifyOtp({
@@ -275,6 +278,18 @@ class ApiService {
       debugPrint('Error fetching borrow history: $e');
       return null;
     }
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otpCode,
+    required String newPassword,
+  }) async {
+    await _dio.post('/auth/reset-password', data: {
+      'email': email,
+      'otpCode': otpCode,
+      'newPassword': newPassword,
+    });
   }
 
 }

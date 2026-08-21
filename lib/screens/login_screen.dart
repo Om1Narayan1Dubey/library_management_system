@@ -10,7 +10,8 @@ import '../utils/top_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../providers/api_provider.dart';
-
+import 'admin/staff_home_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -51,12 +52,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       ref.read(currentUserProvider.notifier).state = response;
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(
-          ),
-        ),
-      );
+      final role = response['role'] ?? 'MEMBER';
+
+      if (role == 'ADMIN' || role == 'LIBRARIAN') {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const StaffHomeScreen()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
     } on DioException catch (e) {
       final msg = e.response?.data['error'] ?? 'Login failed. Please try again.';
 
@@ -186,7 +192,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                               const Spacer(),
                               GestureDetector(
-                                onTap: () {},
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                                  );
+                                },
                                 child: Text(
                                   'Forgot password?',
                                   style: GoogleFonts.inter(

@@ -7,6 +7,7 @@ import 'home_screen.dart';
 import 'login_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import 'admin/staff_home_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -38,14 +39,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
         ref.read(currentUserProvider.notifier).state = profile;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const HomeScreen(),
-          ),
-        );
+        final role = profile['role'] ?? 'MEMBER';
+
+        if (role == 'ADMIN' || role == 'LIBRARIAN') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const StaffHomeScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        }
       } else {
-        // 2. THE FIX: Use the capitalized Class Name!
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const LoginScreen()),

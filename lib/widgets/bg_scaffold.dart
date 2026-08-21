@@ -3,7 +3,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_colors.dart';
 
 class BgScaffold extends StatelessWidget {
-  // ── THE DART SYNTAX TO LEARN: Passing a Widget ──
   final Widget child;
 
   const BgScaffold({super.key, required this.child});

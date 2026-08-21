@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Frosted-glass card. No BackdropFilter (causes Windows crashes).
-// Glass effect via layered gradient + border + shadow.
+
 class GlassCard extends StatelessWidget {
   final Widget child;
   const GlassCard({super.key, required this.child});

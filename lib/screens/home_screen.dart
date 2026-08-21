@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 
-import 'admin/admin_home_screen.dart';
-import 'staff/staff_home_screen.dart';
+import 'admin/staff_home_screen.dart';
 import 'student/student_home_screen.dart';
 
 
@@ -24,7 +23,7 @@ class HomeScreen extends ConsumerWidget {
 
     switch (role) {
       case 'ADMIN':
-        return const AdminHomeScreen();
+        return const StaffHomeScreen();
       case 'LIBRARIAN':
         return const StaffHomeScreen();
       default:

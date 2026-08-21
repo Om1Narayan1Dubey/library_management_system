@@ -17,19 +17,26 @@ import '../../providers/borrow_history_provider.dart';
 import '../../providers/daily_activity_provider.dart';
 
 // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
-// 🟩🟩🟩🟩🟩             MAIN ADMIN LAYOUT             🟩🟩🟩🟩🟩
+// 🟩🟩🟩🟩🟩             MAIN LAYOUT                   🟩🟩🟩🟩🟩
 // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 final adminTabProvider = StateProvider<int>((ref) => 0);
 
-class AdminHomeScreen extends ConsumerStatefulWidget {
-  const AdminHomeScreen({super.key});
-
-  @override
-  ConsumerState<AdminHomeScreen> createState() => _AdminHomeScreenState();
+Color getThemeColor(String role) {
+  if (role == 'LIBRARIAN') {
+    return const Color(0xFF00B894);
+  }
+  return LoginColors.accent;
 }
 
-class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
+class StaffHomeScreen extends ConsumerStatefulWidget {
+  const StaffHomeScreen({super.key});
+
+  @override
+  ConsumerState<StaffHomeScreen> createState() => _AdminHomeScreenState();
+}
+
+class _AdminHomeScreenState extends ConsumerState<StaffHomeScreen> {
   Future<void> _signOut() async {
     final navigator = Navigator.of(context);
     await ref.read(apiProvider).logout();
@@ -122,6 +129,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   Widget _buildUnifiedTabInterface(int currentIndex) {
     const double tabHeight = 70.0;
 
+    final user = ref.watch(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = getThemeColor(role);
+
     return Stack(
       children: [
         Positioned.fill(
@@ -171,6 +182,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                 'Dashboard',
                 tabHeight,
                 currentIndex,
+                themeColor,
               ),
               _buildTabItem(
                 1,
@@ -178,6 +190,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                 'Books',
                 tabHeight,
                 currentIndex,
+                themeColor,
               ),
               _buildTabItem(
                 2,
@@ -185,6 +198,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                 'Members',
                 tabHeight,
                 currentIndex,
+                themeColor,
               ),
               _buildTabItem(
                 3,
@@ -192,6 +206,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                 'Reports',
                 tabHeight,
                 currentIndex,
+                themeColor,
               ),
             ],
           ),
@@ -206,6 +221,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     String label,
     double height,
     int currentIndex,
+    Color themeColor,
   ) {
     final isSelected = currentIndex == index;
 
@@ -241,7 +257,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
             Icon(
               icon,
               color: isSelected
-                  ? LoginColors.accent
+                  ? themeColor
                   : LoginColors.textDark.withValues(alpha: 0.4),
               size: isSelected ? 22 : 20,
             ),
@@ -250,7 +266,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
               label,
               style: GoogleFonts.inter(
                 color: isSelected
-                    ? LoginColors.accent
+                    ? themeColor
                     : LoginColors.textDark.withValues(alpha: 0.4),
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 fontSize: 11,
@@ -265,6 +281,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   Widget _buildTopBar() {
     final user = ref.watch(currentUserProvider);
     final username = user?['username'] ?? 'Admin';
+
+    final role = user?['role'] ?? 'MEMBER';
+
+    final themeColor = getThemeColor(role);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -309,10 +329,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       ),
                     ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.shield_rounded,
-                      color: LoginColors.accent,
+                      color: themeColor,
                       size: 22,
                     ),
                   ),
@@ -323,7 +343,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Admin Panel',
+                        role == 'LIBRARIAN' ? 'Librarian Panel' : 'Admin Panel',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           color: LoginColors.textDark.withValues(alpha: 0.55),
@@ -340,11 +360,11 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Role: Admin',
+                        'Role: $role',
                         style: GoogleFonts.inter(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: LoginColors.accent,
+                          color: themeColor,
                         ),
                       ),
                     ],
@@ -443,10 +463,15 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
   Widget build(BuildContext context) {
     final statsAsync = ref.watch(dashboardStatsProvider);
 
+    final user = ref.watch(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     return statsAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: LoginColors.accent),
-      ),
+      loading: () =>
+          Center(child: CircularProgressIndicator(color: themeColor)),
 
       error: (err, stack) => Center(
         child: Text(
@@ -462,7 +487,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               title: 'Total Users',
               value: stats['totalUsers'].toString(),
               icon: Icons.group,
-              color: AdminColors.purple,
+              color: themeColor,
               isSelected: _selectedStatIndex == 0,
               onTap: () => setState(() => _selectedStatIndex = 0),
             ),
@@ -471,7 +496,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               title: 'Total Books',
               value: stats['totalBooks'].toString(),
               icon: Icons.library_books,
-              color: AdminColors.purple,
+              color: themeColor,
               isSelected: _selectedStatIndex == 1,
               onTap: () => setState(() => _selectedStatIndex = 1),
             ),
@@ -480,7 +505,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               title: 'Issued',
               value: stats['currentlyIssued'].toString(),
               icon: Icons.bookmark,
-              color: AdminColors.purple,
+              color: themeColor,
               isSelected: _selectedStatIndex == 2,
               onTap: () => setState(() => _selectedStatIndex = 2),
             ),
@@ -733,18 +758,16 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
   }
 
   Color _getChartColor() {
-    switch (_selectedStatIndex) {
-      case 0:
-        return AdminColors.purple;
-      case 1:
-        return AdminColors.purple;
-      case 2:
-        return AdminColors.purple;
-      case 3:
-        return AppColors.error;
-      default:
-        return LoginColors.accent;
+    final role = ref.read(currentUserProvider)?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
+    if (_selectedStatIndex == 3) {
+      return AppColors.error;
     }
+
+    return themeColor;
   }
 }
 
@@ -770,7 +793,6 @@ class _SelectableStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayColor = isAlert ? AppColors.error : color;
-    // This allows the card to shrink or grow naturally based on its text size.
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -1010,6 +1032,12 @@ class _BooksViewState extends ConsumerState<BooksView> {
   }
 
   Future<void> _showEditBookDialog(Map<String, dynamic> book) async {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     final editTitleController = TextEditingController(text: book['title']);
     final editAuthorController = TextEditingController(text: book['author']);
     final editIsbnController = TextEditingController(text: book['isbn'] ?? '');
@@ -1133,7 +1161,7 @@ class _BooksViewState extends ConsumerState<BooksView> {
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: LoginColors.accent,
+                            backgroundColor: themeColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -1177,6 +1205,12 @@ class _BooksViewState extends ConsumerState<BooksView> {
     TextEditingController controller, {
     bool isNumber = false,
   }) {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     return Container(
       decoration: BoxDecoration(
         color: LoginColors.cardBase,
@@ -1198,7 +1232,7 @@ class _BooksViewState extends ConsumerState<BooksView> {
           hintStyle: GoogleFonts.inter(
             color: LoginColors.textDark.withValues(alpha: 0.4),
           ),
-          prefixIcon: Icon(icon, color: LoginColors.accent),
+          prefixIcon: Icon(icon, color: themeColor),
           filled: true,
           fillColor: Colors.black.withValues(alpha: 0.02),
           contentPadding: const EdgeInsets.symmetric(vertical: 18),
@@ -1208,7 +1242,7 @@ class _BooksViewState extends ConsumerState<BooksView> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: LoginColors.accent, width: 1.5),
+            borderSide: BorderSide(color: themeColor, width: 1.5),
           ),
         ),
       ),
@@ -1216,6 +1250,12 @@ class _BooksViewState extends ConsumerState<BooksView> {
   }
 
   Widget _buildAddBookUi({required bool isMobile}) {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     Widget formContent = SingleChildScrollView(
       physics: isMobile
           ? const NeverScrollableScrollPhysics()
@@ -1253,7 +1293,7 @@ class _BooksViewState extends ConsumerState<BooksView> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submitBook,
               style: ElevatedButton.styleFrom(
-                backgroundColor: LoginColors.accent,
+                backgroundColor: themeColor,
                 elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -1309,10 +1349,15 @@ class _BooksViewState extends ConsumerState<BooksView> {
   }) {
     final booksAsync = ref.watch(booksProvider);
 
+    final user = ref.watch(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     Widget listContent = booksAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: LoginColors.accent),
-      ),
+      loading: () =>
+          Center(child: CircularProgressIndicator(color: themeColor)),
       error: (err, stack) => Center(
         child: Text(
           'Failed to load books.',
@@ -1350,10 +1395,10 @@ class _BooksViewState extends ConsumerState<BooksView> {
               books.length + (ref.read(booksProvider.notifier).hasMore ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == books.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16.0),
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: Center(
-                  child: CircularProgressIndicator(color: LoginColors.accent),
+                  child: CircularProgressIndicator(color: themeColor),
                 ),
               );
             }
@@ -1385,12 +1430,12 @@ class _BooksViewState extends ConsumerState<BooksView> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AdminColors.purple.withValues(alpha: 0.1),
+                      color: themeColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.book_rounded,
-                      color: AdminColors.purple,
+                      color: themeColor,
                       size: 24,
                     ),
                   ),
@@ -1405,9 +1450,7 @@ class _BooksViewState extends ConsumerState<BooksView> {
                               : 'Library Database',
                           style: GoogleFonts.dmSerifDisplay(
                             fontSize: 14,
-                            color: isDeleteMode
-                                ? AppColors.error
-                                : LoginColors.accent,
+                            color: isDeleteMode ? AppColors.error : themeColor,
                           ),
                         ),
                         Text(
@@ -1437,15 +1480,13 @@ class _BooksViewState extends ConsumerState<BooksView> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: LoginColors.accent.withValues(
-                                  alpha: 0.1,
-                                ),
+                                color: themeColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 book['category'] ?? 'General',
                                 style: GoogleFonts.inter(
-                                  color: LoginColors.accent,
+                                  color: themeColor,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -1476,32 +1517,31 @@ class _BooksViewState extends ConsumerState<BooksView> {
                       ],
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: isDeleteMode
-                          ? AppColors.error.withValues(alpha: 0.1)
-                          : LoginColors.accent.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        isDeleteMode
-                            ? Icons.delete_forever_rounded
-                            : Icons.edit_rounded,
+                  if (role == 'ADMIN' || !isDeleteMode)
+                    Container(
+                      decoration: BoxDecoration(
                         color: isDeleteMode
-                            ? AppColors.error
-                            : LoginColors.accent,
-                        size: 20,
+                            ? AppColors.error.withValues(alpha: 0.1)
+                            : themeColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
                       ),
-                      onPressed: () {
-                        if (isDeleteMode) {
-                          _showDeleteBookDialog(book);
-                        } else {
-                          _showEditBookDialog(book);
-                        }
-                      },
+                      child: IconButton(
+                        icon: Icon(
+                          isDeleteMode
+                              ? Icons.delete_forever_rounded
+                              : Icons.edit_rounded,
+                          color: isDeleteMode ? AppColors.error : themeColor,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          if (isDeleteMode) {
+                            _showDeleteBookDialog(book);
+                          } else {
+                            _showEditBookDialog(book);
+                          }
+                        },
+                      ),
                     ),
-                  ),
                 ],
               ),
             );
@@ -1550,6 +1590,9 @@ class _BooksViewState extends ConsumerState<BooksView> {
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 850;
 
+    final user = ref.watch(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+
     Widget leftMenu = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1576,13 +1619,14 @@ class _BooksViewState extends ConsumerState<BooksView> {
           Icons.search_rounded,
         ),
 
-        _buildMenuButton(
-          2,
-          'Delete Books',
-          'Admin access only',
-          Icons.delete_forever_rounded,
-          isDanger: true,
-        ),
+        if (role == 'ADMIN')
+          _buildMenuButton(
+            2,
+            'Delete Books',
+            'Admin access only',
+            Icons.delete_forever_rounded,
+            isDanger: true,
+          ),
       ],
     );
 
@@ -1645,6 +1689,12 @@ class _BooksViewState extends ConsumerState<BooksView> {
     IconData icon, {
     bool isDanger = false,
   }) {
+    final user = ref.watch(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     final isSelected = _selectedMenuIndex == index;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1681,14 +1731,14 @@ class _BooksViewState extends ConsumerState<BooksView> {
                   color: isSelected
                       ? (isDanger
                             ? AppColors.error.withValues(alpha: 0.2)
-                            : LoginColors.accent.withValues(alpha: 0.2))
+                            : themeColor.withValues(alpha: 0.2))
                       : Colors.black.withValues(alpha: 0.05),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   icon,
                   color: isSelected
-                      ? (isDanger ? AppColors.error : LoginColors.accent)
+                      ? (isDanger ? AppColors.error : themeColor)
                       : LoginColors.textDark.withValues(alpha: 0.5),
                 ),
               ),
@@ -1702,7 +1752,7 @@ class _BooksViewState extends ConsumerState<BooksView> {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
                         color: isSelected
-                            ? (isDanger ? AppColors.error : LoginColors.accent)
+                            ? (isDanger ? AppColors.error : themeColor)
                             : LoginColors.textDark,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -1834,6 +1884,11 @@ class _MembersViewState extends ConsumerState<MembersView> {
   Future<void> _changeRoleDialog(Map<String, dynamic> member) async {
     String selectedRole = member['role'] ?? 'MEMBER';
     final isSelf = member['email'] == widget.adminEmail;
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
 
     if (isSelf) {
       if (!context.mounted) return;
@@ -1888,7 +1943,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                           ),
                           value: role,
                           // groupValue and onChanged are completely removed from here!
-                          activeColor: AdminColors.purple,
+                          activeColor: themeColor,
                           contentPadding: EdgeInsets.zero,
                         );
                       }).toList(),
@@ -1929,7 +1984,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                   child: Text(
                     'Update Role',
                     style: GoogleFonts.inter(
-                      color: AdminColors.purple,
+                      color: themeColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -2043,6 +2098,12 @@ class _MembersViewState extends ConsumerState<MembersView> {
     showDialog(
       context: context,
       builder: (ctx) {
+        final user = ref.read(currentUserProvider);
+        final role = user?['role'] ?? 'MEMBER';
+        final themeColor = role == 'LIBRARIAN'
+            ? const Color(0xFF00B894)
+            : AdminColors.purple;
+
         return Dialog(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -2082,7 +2143,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                   child: Text(
                     (member['name'] ?? 'U')[0].toUpperCase(),
                     style: GoogleFonts.dmSerifDisplay(
-                      color: LoginColors.accent,
+                      color: themeColor,
                       fontSize: 32,
                     ),
                   ),
@@ -2169,9 +2230,15 @@ class _MembersViewState extends ConsumerState<MembersView> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     return Row(
       children: [
-        Icon(icon, color: LoginColors.accent.withValues(alpha: 0.7), size: 20),
+        Icon(icon, color: themeColor.withValues(alpha: 0.7), size: 20),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
@@ -2214,6 +2281,11 @@ class _MembersViewState extends ConsumerState<MembersView> {
     // ── 1. MEASURE THE SCREEN ──
     final isMobile = MediaQuery.of(context).size.width < 850;
 
+    final user = ref.watch(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
     // ── 2. THE MENU BUTTONS ──
     Widget menuButtons = Column(
       children: [
@@ -2221,7 +2293,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
           title: 'Search Members',
           subtitle: 'Find & view user details',
           icon: Icons.search_rounded,
-          color: LoginColors.accent,
+          color: themeColor,
           isSelected: _selectedMenuIndex == 0,
           onTap: () => setState(() => _selectedMenuIndex = 0),
         ),
@@ -2230,19 +2302,20 @@ class _MembersViewState extends ConsumerState<MembersView> {
           title: 'Add New Member',
           subtitle: 'Manually register a user',
           icon: Icons.person_add_rounded,
-          color: LoginColors.accent,
+          color: themeColor,
           isSelected: _selectedMenuIndex == 1,
           onTap: () => setState(() => _selectedMenuIndex = 1),
         ),
         const SizedBox(height: 16),
-        _MemberActionCard(
-          title: 'Delete Member',
-          subtitle: 'Admin access only',
-          icon: Icons.person_remove_rounded,
-          color: AppColors.error,
-          isSelected: _selectedMenuIndex == 2,
-          onTap: () => setState(() => _selectedMenuIndex = 2),
-        ),
+        if (role == 'ADMIN')
+          _MemberActionCard(
+            title: 'Delete Member',
+            subtitle: 'Admin access only',
+            icon: Icons.person_remove_rounded,
+            color: AppColors.error,
+            isSelected: _selectedMenuIndex == 2,
+            onTap: () => setState(() => _selectedMenuIndex = 2),
+          ),
       ],
     );
 
@@ -2351,10 +2424,15 @@ class _MembersViewState extends ConsumerState<MembersView> {
   Widget _buildListUi({required bool isDeleteMode, required bool isMobile}) {
     final membersAsync = ref.watch(membersProvider);
 
+    final user = ref.watch(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     Widget listContent = membersAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: LoginColors.accent),
-      ),
+      loading: () =>
+          Center(child: CircularProgressIndicator(color: themeColor)),
       error: (err, stack) => Center(
         child: Text(
           'Failed to load members.',
@@ -2393,10 +2471,10 @@ class _MembersViewState extends ConsumerState<MembersView> {
               (ref.read(membersProvider.notifier).hasMore ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == members.length) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
-                  child: CircularProgressIndicator(color: LoginColors.accent),
+                  child: CircularProgressIndicator(color: themeColor),
                 ),
               );
             }
@@ -2443,13 +2521,13 @@ class _MembersViewState extends ConsumerState<MembersView> {
                       CircleAvatar(
                         radius: 24,
                         backgroundColor: isAdmin
-                            ? LoginColors.accent.withValues(alpha: 0.15)
+                            ? themeColor.withValues(alpha: 0.15)
                             : Colors.black.withValues(alpha: 0.05),
                         child: Text(
                           (member['name'] ?? 'U')[0].toUpperCase(),
                           style: GoogleFonts.dmSerifDisplay(
                             color: isAdmin
-                                ? LoginColors.accent
+                                ? themeColor
                                 : LoginColors.textDark.withValues(alpha: 0.7),
                             fontSize: 20,
                           ),
@@ -2460,7 +2538,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 1. Wrap automatically drops the badge to the next line if space runs out!
                             Wrap(
                               crossAxisAlignment: WrapCrossAlignment.center,
                               spacing: 8, // Space between name and badge
@@ -2477,7 +2554,9 @@ class _MembersViewState extends ConsumerState<MembersView> {
 
                                 if (!isDeleteMode)
                                   GestureDetector(
-                                    onTap: () => _changeRoleDialog(member),
+                                    onTap: role == 'ADMIN'
+                                        ? () => _changeRoleDialog(member)
+                                        : null,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
@@ -2485,9 +2564,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isAdmin
-                                            ? LoginColors.accent.withValues(
-                                                alpha: 0.12,
-                                              )
+                                            ? themeColor.withValues(alpha: 0.12)
                                             : Colors.black.withValues(
                                                 alpha: 0.05,
                                               ),
@@ -2500,7 +2577,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                                             member['role'] ?? 'MEMBER',
                                             style: GoogleFonts.inter(
                                               color: isAdmin
-                                                  ? LoginColors.accent
+                                                  ? themeColor
                                                   : LoginColors.textDark
                                                         .withValues(alpha: 0.7),
                                               fontSize: 10,
@@ -2508,14 +2585,15 @@ class _MembersViewState extends ConsumerState<MembersView> {
                                             ),
                                           ),
                                           const SizedBox(width: 4),
-                                          Icon(
-                                            Icons.edit_rounded,
-                                            size: 12,
-                                            color: isAdmin
-                                                ? LoginColors.accent
-                                                : LoginColors.textDark
-                                                      .withValues(alpha: 0.5),
-                                          ),
+                                          if (role == 'ADMIN')
+                                            Icon(
+                                              Icons.edit_rounded,
+                                              size: 12,
+                                              color: isAdmin
+                                                  ? LoginColors.accent
+                                                  : LoginColors.textDark
+                                                        .withValues(alpha: 0.5),
+                                            ),
                                         ],
                                       ),
                                     ),
@@ -2523,7 +2601,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            // 2. Added ellipsis so emails smoothly truncate instead of stacking vertically
                             Text(
                               member['email'] ?? '',
                               style: GoogleFonts.inter(
@@ -2535,7 +2612,6 @@ class _MembersViewState extends ConsumerState<MembersView> {
                               overflow: TextOverflow.ellipsis,
                             ),
 
-                            // 3. Moved the joined date to the main column for maximum horizontal breathing room
                             if (!isDeleteMode) ...[
                               const SizedBox(height: 8),
                               Text(
@@ -2596,47 +2672,48 @@ class _MembersViewState extends ConsumerState<MembersView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: LoginColors.cardBase,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.black.withValues(alpha: 0.05),
-              width: 1.5,
+        if (role == 'ADMIN' || !isDeleteMode)
+          Container(
+            decoration: BoxDecoration(
+              color: LoginColors.cardBase,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.black.withValues(alpha: 0.05),
+                width: 1.5,
+              ),
             ),
-          ),
-          child: TextField(
-            controller: _searchController,
-            style: GoogleFonts.inter(
-              color: LoginColors.textDark,
-              fontWeight: FontWeight.w500,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Search by name or email...',
-              hintStyle: GoogleFonts.inter(
-                color: LoginColors.textDark.withValues(alpha: 0.4),
+            child: TextField(
+              controller: _searchController,
+              style: GoogleFonts.inter(
+                color: LoginColors.textDark,
+                fontWeight: FontWeight.w500,
               ),
-              prefixIcon: const Icon(Icons.search, color: LoginColors.accent),
-              filled: true,
-              fillColor: Colors.black.withValues(alpha: 0.02),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: isDeleteMode ? AppColors.error : LoginColors.accent,
-                  width: 1.5,
+              decoration: InputDecoration(
+                hintText: 'Search by name or email...',
+                hintStyle: GoogleFonts.inter(
+                  color: LoginColors.textDark.withValues(alpha: 0.4),
+                ),
+                prefixIcon: Icon(Icons.search, color: themeColor),
+                filled: true,
+                fillColor: Colors.black.withValues(alpha: 0.02),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: isDeleteMode ? AppColors.error : themeColor,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         const SizedBox(height: 24),
         Text(
           isDeleteMode
@@ -2655,6 +2732,12 @@ class _MembersViewState extends ConsumerState<MembersView> {
   }
 
   Widget _buildAddMemberUi({required bool isMobile}) {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     Widget formContent = SingleChildScrollView(
       physics: isMobile
           ? const NeverScrollableScrollPhysics()
@@ -2708,7 +2791,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                     color: LoginColors.textDark,
                     fontWeight: FontWeight.w600,
                   ),
-                  items: ['MEMBER', 'LIBRARIAN', 'ADMIN'].map((String value) {
+                  items: ['MEMBER', 'LIBRARIAN'].map((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),
@@ -2726,9 +2809,9 @@ class _MembersViewState extends ConsumerState<MembersView> {
               child: ElevatedButton(
                 onPressed: _isSubmitting ? null : _submitNewMember,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: LoginColors.accent,
+                  backgroundColor: themeColor,
                   elevation: 0,
-                  shadowColor: LoginColors.accent.withValues(alpha: 0.5),
+                  shadowColor: themeColor.withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -2756,23 +2839,21 @@ class _MembersViewState extends ConsumerState<MembersView> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: LoginColors.accent.withValues(alpha: 0.1),
+                color: themeColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: LoginColors.accent.withValues(alpha: 0.3),
-                ),
+                border: Border.all(color: themeColor.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: LoginColors.accent.withValues(alpha: 0.2),
+                      color: themeColor.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.mark_email_read_rounded,
-                      color: LoginColors.accent,
+                      color: themeColor,
                       size: 28,
                     ),
                   ),
@@ -2784,7 +2865,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                         Text(
                           'Account Created',
                           style: GoogleFonts.inter(
-                            color: LoginColors.accent,
+                            color: themeColor,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -2844,10 +2925,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: LoginColors.accent,
-                          width: 2,
-                        ),
+                        borderSide: BorderSide(color: themeColor, width: 2),
                       ),
                     ),
                     onChanged: (value) {
@@ -2868,7 +2946,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
                   child: Text(
                     'Verifying OTP...',
                     style: GoogleFonts.inter(
-                      color: LoginColors.accent,
+                      color: themeColor,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -2947,6 +3025,12 @@ class _MembersViewState extends ConsumerState<MembersView> {
     bool isObscure = false,
     bool enabled = true,
   }) {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     return Container(
       decoration: BoxDecoration(
         color: LoginColors.cardBase,
@@ -2975,7 +3059,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
           prefixIcon: Icon(
             icon,
             color: enabled
-                ? LoginColors.accent
+                ? themeColor
                 : LoginColors.textDark.withValues(alpha: 0.2),
           ),
           filled: true,
@@ -2988,7 +3072,7 @@ class _MembersViewState extends ConsumerState<MembersView> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: LoginColors.accent, width: 1.5),
+            borderSide: BorderSide(color: themeColor, width: 1.5),
           ),
         ),
       ),
@@ -3141,6 +3225,12 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     String tempSort = _filterSort;
     DateTime tempDate = _filterDate;
 
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     await showDialog(
       context: context,
       builder: (ctx) {
@@ -3189,8 +3279,8 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                           lastDate: DateTime.now(),
                           builder: (context, child) => Theme(
                             data: ThemeData.light().copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: LoginColors.accent,
+                              colorScheme: ColorScheme.light(
+                                primary: themeColor,
                               ),
                             ),
                             child: child!,
@@ -3215,9 +3305,9 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.calendar_month_rounded,
-                              color: LoginColors.accent,
+                              color: themeColor,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -3260,7 +3350,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor: LoginColors.accent,
+                          selectedColor: themeColor,
                           backgroundColor: Colors.black.withValues(alpha: 0.04),
                           showCheckmark: false,
                           shape: RoundedRectangleBorder(
@@ -3300,7 +3390,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor: LoginColors.accent,
+                          selectedColor: themeColor,
                           backgroundColor: Colors.black.withValues(alpha: 0.04),
                           showCheckmark: false,
                           shape: RoundedRectangleBorder(
@@ -3327,7 +3417,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
                           Navigator.pop(ctx);
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: LoginColors.accent,
+                          backgroundColor: themeColor,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
@@ -3355,10 +3445,14 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
   }
 
   Future<void> _showLogDetailsDialog(Map<String, dynamic> log) async {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     final bool isIssue = log['action'] == 'ISSUED';
-    final Color actionColor = isIssue
-        ? LoginColors.accent
-        : const Color(0xFF00B894);
+    final Color actionColor = isIssue ? themeColor : const Color(0xFF00B894);
     final double fine = (log['fine'] as num?)?.toDouble() ?? 0.0;
 
     showDialog(
@@ -3539,10 +3633,15 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
     String value, {
     Color? valueColor,
   }) {
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: LoginColors.accent.withValues(alpha: 0.7), size: 20),
+        Icon(icon, color: themeColor.withValues(alpha: 0.7), size: 20),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
@@ -3573,22 +3672,26 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
   }
 
   Widget _buildDailyActivityUi({required bool isMobile}) {
-    String? dateString = "${_filterDate.year}-${_filterDate.month
-        .toString()
-        .padLeft(2, '0')}-${_filterDate.day.toString().padLeft(2, '0')}";
+    String? dateString =
+        "${_filterDate.year}-${_filterDate.month.toString().padLeft(2, '0')}-${_filterDate.day.toString().padLeft(2, '0')}";
 
     final dailyAsync = ref.watch(dailyActivityProvider(dateString));
 
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
+
     return dailyAsync.when(
       loading: () =>
-      const Center(
-        child: CircularProgressIndicator(color: LoginColors.accent),
+          Center(child: CircularProgressIndicator(color: themeColor)),
+      error: (err, stack) => Center(
+        child: Text(
+          'Failed to load daily activity.',
+          style: GoogleFonts.inter(color: AppColors.error),
+        ),
       ),
-      error: (err, stack) =>
-          Center(
-            child: Text('Failed to load daily activity.',
-                style: GoogleFonts.inter(color: AppColors.error)),
-          ),
       data: (data) {
         final todayIssuesCount = data['todayIssues'] ?? 0;
         final todayReturnsCount = data['todayReturns'] ?? 0;
@@ -3601,8 +3704,8 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
           final action = (log['action'] ?? '').toString();
 
           final matchesSearch = book.contains(query) || member.contains(query);
-          final matchesAction = _filterAction == 'ALL' ||
-              action == _filterAction;
+          final matchesAction =
+              _filterAction == 'ALL' || action == _filterAction;
           return matchesSearch && matchesAction;
         }).toList();
 
@@ -3616,7 +3719,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
               child: _buildSummaryCard(
                 'Today\'s Issues',
                 todayIssuesCount.toString(),
-                LoginColors.accent,
+                themeColor,
                 Icons.outbox_rounded,
               ),
             ),
@@ -3653,9 +3756,9 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
               hintStyle: GoogleFonts.inter(
                 color: LoginColors.textDark.withValues(alpha: 0.4),
               ),
-              prefixIcon: const Icon(Icons.search, color: LoginColors.accent),
+              prefixIcon: Icon(Icons.search, color: themeColor),
               suffixIcon: IconButton(
-                icon: const Icon(Icons.tune_rounded, color: LoginColors.accent),
+                icon: Icon(Icons.tune_rounded, color: themeColor),
                 onPressed: _showFilterDialog,
               ),
               // Filter Icon from wireframe
@@ -3671,136 +3774,138 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
 
         Widget listContent = filteredLogs.isEmpty
             ? Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Text(
-              'No activity found.',
-              style: GoogleFonts.inter(
-                color: LoginColors.textDark.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-        )
-            : ListView.builder(
-          physics: isMobile
-              ? const NeverScrollableScrollPhysics()
-              : const BouncingScrollPhysics(),
-          shrinkWrap: isMobile,
-          padding: const EdgeInsets.only(
-            bottom: 20,
-            top: 8,
-            left: 12,
-            right: 12,
-          ),
-          itemCount: filteredLogs.length,
-          itemBuilder: (context, index) {
-            final log = filteredLogs[index];
-            final isIssue = log['action'] == 'ISSUED';
-            final actionColor = isIssue
-                ? LoginColors.accent
-                : const Color(0xFF00B894);
-
-            return MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => _showLogDetailsDialog(log),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 20),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: LoginColors.cardBase,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFA3B1C6).withValues(alpha: 0.4),
-                        offset: const Offset(3, 3),
-                        blurRadius: 8,
-                      ),
-                      const BoxShadow(
-                        color: Colors.white,
-                        offset: Offset(-3, -3),
-                        blurRadius: 8,
-                      ),
-                    ],
-                    border: Border.all(color: Colors.white, width: 1),
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Text(
+                    'No activity found.',
+                    style: GoogleFonts.inter(
+                      color: LoginColors.textDark.withValues(alpha: 0.4),
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      // Status Indicator Dot
-                      Container(
-                        width: 5,
-                        height: 40,
+                ),
+              )
+            : ListView.builder(
+                physics: isMobile
+                    ? const NeverScrollableScrollPhysics()
+                    : const BouncingScrollPhysics(),
+                shrinkWrap: isMobile,
+                padding: const EdgeInsets.only(
+                  bottom: 20,
+                  top: 8,
+                  left: 12,
+                  right: 12,
+                ),
+                itemCount: filteredLogs.length,
+                itemBuilder: (context, index) {
+                  final log = filteredLogs[index];
+                  final isIssue = log['action'] == 'ISSUED';
+                  final actionColor = isIssue
+                      ? themeColor
+                      : const Color(0xFF00B894);
+
+                  return MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => _showLogDetailsDialog(log),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: actionColor,
-                          borderRadius: BorderRadius.circular(4),
+                          color: LoginColors.cardBase,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFFA3B1C6,
+                              ).withValues(alpha: 0.4),
+                              offset: const Offset(3, 3),
+                              blurRadius: 8,
+                            ),
+                            const BoxShadow(
+                              color: Colors.white,
+                              offset: Offset(-3, -3),
+                              blurRadius: 8,
+                            ),
+                          ],
+                          border: Border.all(color: Colors.white, width: 1),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              log['book_title'] ?? '',
-                              style: GoogleFonts.inter(
-                                color: LoginColors.textDark,
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
+                            // Status Indicator Dot
+                            Container(
+                              width: 5,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: actionColor,
+                                borderRadius: BorderRadius.circular(4),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              log['member_name'] ?? '',
-                              style: GoogleFonts.inter(
-                                color: LoginColors.textDark.withValues(
-                                  alpha: 0.6,
-                                ),
-                                fontSize: 13,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    log['book_title'] ?? '',
+                                    style: GoogleFonts.inter(
+                                      color: LoginColors.textDark,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    log['member_name'] ?? '',
+                                    style: GoogleFonts.inter(
+                                      color: LoginColors.textDark.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: actionColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    log['action'] ?? '',
+                                    style: GoogleFonts.inter(
+                                      color: actionColor,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  log['time'] ?? '',
+                                  style: GoogleFonts.inter(
+                                    color: LoginColors.textDark.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: actionColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              log['action'] ?? '',
-                              style: GoogleFonts.inter(
-                                color: actionColor,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            log['time'] ?? '',
-                            style: GoogleFonts.inter(
-                              color: LoginColors.textDark.withValues(
-                                alpha: 0.5,
-                              ),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
+                    ),
+                  );
+                },
+              );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3886,11 +3991,15 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
 
   Widget _buildHistoryUi({required bool isMobile}) {
     final historyAsync = ref.watch(borrowHistoryProvider);
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
 
     Widget listContent = historyAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: LoginColors.accent),
-      ),
+      loading: () =>
+          Center(child: CircularProgressIndicator(color: themeColor)),
 
       error: (err, stack) => Center(
         child: Text(
@@ -3928,17 +4037,17 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
               (ref.read(borrowHistoryProvider.notifier).hasMore ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == history.length) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
-                  child: CircularProgressIndicator(color: LoginColors.accent),
+                  child: CircularProgressIndicator(color: themeColor),
                 ),
               );
             }
             final record = history[index];
             final String status = record['status'] ?? 'ACTIVE';
 
-            Color statusColor = LoginColors.accent;
+            Color statusColor = themeColor;
             if (status == 'OVERDUE') statusColor = AppColors.error;
             if (status == 'RETURNED')
               statusColor = LoginColors.textDark.withValues(alpha: 0.4);
@@ -4132,6 +4241,11 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 850;
+    final user = ref.read(currentUserProvider);
+    final role = user?['role'] ?? 'MEMBER';
+    final themeColor = role == 'LIBRARIAN'
+        ? const Color(0xFF00B894)
+        : AdminColors.purple;
 
     // LEFT MENU
     Widget menuButtons = Column(
@@ -4140,7 +4254,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
           title: 'Daily Activity Logs',
           subtitle: 'Today\'s Issues & Returns',
           icon: Icons.today_rounded,
-          color: LoginColors.accent,
+          color: themeColor,
           isSelected: _selectedMenuIndex == 0,
           onTap: () => setState(() => _selectedMenuIndex = 0),
         ),
@@ -4151,7 +4265,7 @@ class _ReportsViewState extends ConsumerState<ReportsView> {
           title: 'Borrow History Log',
           subtitle: 'View all system records',
           icon: Icons.history_rounded,
-          color: LoginColors.accent,
+          color: themeColor,
           isSelected: _selectedMenuIndex == 1,
           onTap: () => setState(() => _selectedMenuIndex = 1),
         ),
